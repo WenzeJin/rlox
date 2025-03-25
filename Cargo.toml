@@ -2,5 +2,7 @@
 name = "rlox"
 version = "0.1.0"
 edition = "2021"
+readme = "README.md"
+description = "Rust implementation of Lox language"
 
 [dependencies]
