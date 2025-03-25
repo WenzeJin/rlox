@@ -1,4 +1,9 @@
+//! Scanner:
+//! This is a lexer module that scans the source code and generates tokens
+//! 
+//! Author: Wenze Jin
 
+use std::collections::HashMap;
 use crate::ast::token::{Token, TokenType, Literal};
 use crate::error::{RloxError, report};
 
@@ -7,15 +12,18 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: usize,
+    keywords: HashMap<String, TokenType>,
 }
 
 impl Scanner {
     pub fn new(source: String) -> Scanner {
+        let keywords = generate_keywords();
         Scanner {
             source,
             start: 0,
             current: 0,
             line: 1,
+            keywords,
         }
     }
 
@@ -91,6 +99,8 @@ impl Scanner {
             _ => {
                 if is_digit(c) {
                     self.number(tokens);
+                } else if is_alpha(c) {
+                    self.identifier(tokens);
                 } else {
                     report(RloxError::LexicalError(self.line, "Unexpected character".to_string(), (c as char).to_string()))
                 }
@@ -179,6 +189,16 @@ impl Scanner {
             Err(_) => report(RloxError::LexicalError(self.line, "Invalid number".to_string(), self.source[self.start..self.current].to_string())),
         }
     }
+
+    fn identifier(&mut self, tokens: &mut Vec<Token>) {
+        while is_alpha_numeric(self.peek()) {
+            self.advance();
+        }
+
+        let text = self.source[self.start..self.current].to_string();
+        let t_type = self.keywords.get(&text).unwrap_or(&TokenType::Identifier).clone();
+        self.add_token(tokens, t_type);
+    }
 }
 
 /* Helper funtions */
@@ -187,3 +207,33 @@ fn is_digit(c: u8) -> bool {
     c >= b'0' && c <= b'9'
 }
 
+fn is_alpha(c: u8) -> bool {
+    (c >= b'a' && c <= b'z') || (c >= b'A' && c <= b'Z') || c == b'_'
+}
+
+fn is_alpha_numeric(c: u8) -> bool {
+    is_alpha(c) || is_digit(c)
+}
+
+/* Keywords Map */
+
+fn generate_keywords() -> HashMap<String, TokenType> {
+    let mut keywords: HashMap<String, TokenType> = HashMap::with_capacity(30);
+    keywords.insert("and".to_string(), TokenType::And);
+    keywords.insert("class".to_string(), TokenType::Class);
+    keywords.insert("else".to_string(), TokenType::Else);
+    keywords.insert("false".to_string(), TokenType::False);
+    keywords.insert("for".to_string(), TokenType::For);
+    keywords.insert("fun".to_string(), TokenType::Fun);
+    keywords.insert("if".to_string(), TokenType::If);
+    keywords.insert("nil".to_string(), TokenType::Nil);
+    keywords.insert("or".to_string(), TokenType::Or);
+    keywords.insert("print".to_string(), TokenType::Print);
+    keywords.insert("return".to_string(), TokenType::Return);
+    keywords.insert("super".to_string(), TokenType::Super);
+    keywords.insert("this".to_string(), TokenType::This);
+    keywords.insert("true".to_string(), TokenType::True);
+    keywords.insert("var".to_string(), TokenType::Var);
+    keywords.insert("while".to_string(), TokenType::While);
+    keywords
+}
