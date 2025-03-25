@@ -9,6 +9,7 @@ use crate::error::{RloxError, report};
 
 pub struct Scanner {
     source: String,
+    tokens: Vec<Token>,
     start: usize,
     current: usize,
     line: usize,
@@ -20,6 +21,7 @@ impl Scanner {
         let keywords = generate_keywords();
         Scanner {
             source,
+            tokens: Vec::new(),
             start: 0,
             current: 0,
             line: 1,
@@ -28,15 +30,15 @@ impl Scanner {
     }
 
     pub fn scan_tokens(&mut self) -> Vec<Token> {
-        let mut tokens: Vec<Token> = Vec::new();
         while !self.is_at_end() {
             self.start = self.current;
-            self.scan_token(&mut tokens);
+            self.scan_token();
         }
 
         // push EOF token
-        tokens.push(Token::new(TokenType::EOF, "".to_string(), None, self.line));
-        tokens
+        self.tokens.push(Token::new(TokenType::EOF, "".to_string(), None, self.line));
+        
+        std::mem::take(&mut self.tokens)
     }
 }
 
@@ -45,37 +47,37 @@ impl Scanner {
         self.current >= self.source.len()
     }
 
-    fn scan_token(&mut self, tokens: &mut Vec<Token>) {
+    fn scan_token(&mut self) {
         let c: u8 = self.advance();
         match c {
             // Single-character tokens
-            b'(' => self.add_token(tokens, TokenType::LeftParen),
-            b')' => self.add_token(tokens, TokenType::RightParen),
-            b'{' => self.add_token(tokens, TokenType::LeftBrace),
-            b'}' => self.add_token(tokens, TokenType::RightBrace),
-            b',' => self.add_token(tokens, TokenType::Comma),
-            b'.' => self.add_token(tokens, TokenType::Dot),
-            b'-' => self.add_token(tokens, TokenType::Minus),
-            b'+' => self.add_token(tokens, TokenType::Plus),
-            b';' => self.add_token(tokens, TokenType::Semicolon),
-            b'*' => self.add_token(tokens, TokenType::Star),
+            b'(' => self.add_token(TokenType::LeftParen),
+            b')' => self.add_token(TokenType::RightParen),
+            b'{' => self.add_token(TokenType::LeftBrace),
+            b'}' => self.add_token(TokenType::RightBrace),
+            b',' => self.add_token(TokenType::Comma),
+            b'.' => self.add_token(TokenType::Dot),
+            b'-' => self.add_token(TokenType::Minus),
+            b'+' => self.add_token(TokenType::Plus),
+            b';' => self.add_token(TokenType::Semicolon),
+            b'*' => self.add_token(TokenType::Star),
 
             // One or two character tokens
             b'!' => {
                 let is_equal = self.match_ch(b'=');
-                self.add_token(tokens, if is_equal { TokenType::BangEqual } else { TokenType::Bang });
+                self.add_token(if is_equal { TokenType::BangEqual } else { TokenType::Bang });
             },
             b'=' => {
                 let is_equal = self.match_ch(b'=');
-                self.add_token(tokens, if is_equal { TokenType::EqualEqual } else { TokenType::Equal });
+                self.add_token(if is_equal { TokenType::EqualEqual } else { TokenType::Equal });
             },
             b'<' => {
                 let is_equal = self.match_ch(b'=');
-                self.add_token(tokens, if is_equal { TokenType::LessEqual } else { TokenType::Less });
+                self.add_token(if is_equal { TokenType::LessEqual } else { TokenType::Less });
             },
             b'>' => {
                 let is_equal = self.match_ch(b'=');
-                self.add_token(tokens, if is_equal { TokenType::GreaterEqual } else { TokenType::Greater });
+                self.add_token(if is_equal { TokenType::GreaterEqual } else { TokenType::Greater });
             },
 
             // Slash or comment
@@ -85,11 +87,11 @@ impl Scanner {
                         self.advance();
                     }
                 } else {
-                    self.add_token(tokens, TokenType::Slash);
+                    self.add_token(TokenType::Slash);
                 }
             },
             // String literals handling
-            b'"' => self.string(tokens),
+            b'"' => self.string(),
 
             // Ignore whitespaces
             b' ' | b'\r' | b'\t' => (),
@@ -98,9 +100,9 @@ impl Scanner {
             // Default handling
             _ => {
                 if is_digit(c) {
-                    self.number(tokens);
+                    self.number();
                 } else if is_alpha(c) {
-                    self.identifier(tokens);
+                    self.identifier();
                 } else {
                     report(RloxError::LexicalError(self.line, "Unexpected character".to_string(), (c as char).to_string()))
                 }
@@ -108,14 +110,14 @@ impl Scanner {
         };
     }
 
-    fn add_token(&mut self, tokens: &mut Vec<Token>, t_type: TokenType) {
+    fn add_token(&mut self, t_type: TokenType) {
         let text = self.source[self.start..self.current].to_string();
-        tokens.push(Token::new(t_type, text, None, self.line));
+        self.tokens.push(Token::new(t_type, text, None, self.line));
     }
 
-    fn add_token_with_lit(&mut self, tokens: &mut Vec<Token>, t_type: TokenType, literal: Literal) {
+    fn add_token_with_lit(&mut self, t_type: TokenType, literal: Literal) {
         let text = self.source[self.start..self.current].to_string();
-        tokens.push(Token::new(t_type, text, Some(literal), self.line));
+        self.tokens.push(Token::new(t_type, text, Some(literal), self.line));
     }
 
     fn advance(&mut self) -> u8 {
@@ -154,7 +156,7 @@ impl Scanner {
 }
 
 impl Scanner {
-    fn string(&mut self, tokens: &mut Vec<Token>) {
+    fn string(&mut self) {
         while self.peek() != b'"' && !self.is_at_end() {
             if self.peek() == b'\n' {
                 self.line += 1;
@@ -171,10 +173,10 @@ impl Scanner {
         self.advance();
 
         let value = self.source[self.start + 1..self.current - 1].to_string();
-        self.add_token_with_lit(tokens, TokenType::String, Literal::String(value));
+        self.add_token_with_lit(TokenType::String, Literal::String(value));
     }
 
-    fn number(&mut self, tokens: &mut Vec<Token>) {
+    fn number(&mut self) {
         while is_digit(self.peek()) {
             self.advance();
         }
@@ -185,19 +187,19 @@ impl Scanner {
             }
         }
         match self.source[self.start..self.current].parse::<f64>() {
-            Ok(value) => self.add_token_with_lit(tokens, TokenType::Number, Literal::Number(value)),
+            Ok(value) => self.add_token_with_lit(TokenType::Number, Literal::Number(value)),
             Err(_) => report(RloxError::LexicalError(self.line, "Invalid number".to_string(), self.source[self.start..self.current].to_string())),
         }
     }
 
-    fn identifier(&mut self, tokens: &mut Vec<Token>) {
+    fn identifier(&mut self) {
         while is_alpha_numeric(self.peek()) {
             self.advance();
         }
 
         let text = self.source[self.start..self.current].to_string();
         let t_type = self.keywords.get(&text).unwrap_or(&TokenType::Identifier).clone();
-        self.add_token(tokens, t_type);
+        self.add_token(t_type);
     }
 }
 

@@ -7,7 +7,7 @@ pub fn run_file(filename: &str) -> Result<(), RloxError> {
     let mut file = File::open(filename)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
-    run(contents)?;
+    run_tree_walk(contents)?;
     Ok(())
 }
 
@@ -20,11 +20,11 @@ pub fn run_prompt() -> Result<(), RloxError> {
         stdout.flush()?;
         buffer.clear();
         stdin.read_line(&mut buffer)?;
-        run(buffer.clone())?;
+        run_tree_walk(buffer.clone())?;
     }
 }
 
-pub fn run(source: String) -> Result<(), RloxError> {
+fn run_tree_walk(source: String) -> Result<(), RloxError> {
     let mut scanner = Scanner::new(source);
     let tokens = scanner.scan_tokens();
     for token in tokens {
