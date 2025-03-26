@@ -2,6 +2,8 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 use crate::error::RloxError;
 use crate::scanner::Scanner;
+use crate::parser::Parser;
+use crate::ast::*;
 
 pub fn run_file(filename: &str) -> Result<(), RloxError> {
     let mut file = File::open(filename)?;
@@ -27,8 +29,9 @@ pub fn run_prompt() -> Result<(), RloxError> {
 fn run_tree_walk(source: String) -> Result<(), RloxError> {
     let mut scanner = Scanner::new(source);
     let tokens = scanner.scan_tokens();
-    for token in tokens {
-        println!("{:?}", token);
-    }
+    let mut parser = Parser::new(tokens);
+    let expression = parser.parse();
+    let mut printer = pretty_printer::AstPrinter();
+    println!("{}", expression.accept(&mut printer));
     Ok(())
 }

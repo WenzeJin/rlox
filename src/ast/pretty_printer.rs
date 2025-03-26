@@ -26,8 +26,13 @@ impl expr::Visitor<String> for AstPrinter {
         return self.parenthesize("group", vec![expression]);
     }
 
-    fn visit_literal_expr(&mut self, value: &token::Token) -> String {
-        return value.lexeme.clone();
+    fn visit_literal_expr(&mut self, value: &expr::LiteralValue) -> String {
+        return match value {
+            expr::LiteralValue::Number(n) => n.to_string(),
+            expr::LiteralValue::String(s) => s.clone(),
+            expr::LiteralValue::Boolean(b) => b.to_string(),
+            expr::LiteralValue::Nil => "nil".to_string(),
+        }
     }
 
     fn visit_unary_expr(&mut self, operator: &token::Token, right: &expr::Expr) -> String {
