@@ -25,6 +25,11 @@ cargo build --release  # Build the project
 cargo run # Build & run the project
 ```
 
+## How to test
+
+```bash
+cargo test
+```
 
 > [!NOTE]  
 > This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.  
