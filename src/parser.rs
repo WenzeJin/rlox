@@ -9,6 +9,7 @@ use unescape::unescape;
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
+    pub had_error: bool,
 }
 
 impl Parser {
@@ -16,13 +17,17 @@ impl Parser {
         Parser {
             tokens,
             current: 0,
+            had_error: false,
         }
     }
 }
 
 impl Parser {
-    pub fn parse(&mut self) -> Expr {
-        self.expression()
+    pub fn parse(&mut self) -> Option<Expr> {
+        match self.expression() {
+            Ok(expr) => Some(expr),
+            Err(_e) => None,
+        }
     }
 }
 
@@ -37,6 +42,25 @@ impl Parser {
         };
 
         false
+    }
+
+    fn error(&mut self, message: &str) -> RloxError {
+        self.had_error = true;
+        let error = RloxError::SyntaxError(
+            self.peek().line,
+            message.to_string(),
+            self.peek().lexeme.clone(),
+        );
+        report(&error);
+        error
+    }
+
+    fn consume(&mut self, t: TokenType, message: &str) -> Result<&Token, RloxError> {
+        if self.check(t) {
+            Ok(self.advance())
+        } else {
+            Err(self.error(message))
+        }
     }
 
     fn check(&self, t: TokenType) -> bool {
@@ -67,90 +91,110 @@ impl Parser {
         &self.tokens[self.current - 1]
     }
 
+    fn synchronize(&mut self) {
+        self.advance();
+
+        while !self.is_at_end() {
+            if self.previous().t_type == TokenType::Semicolon {
+                return;
+            }
+
+            match self.peek().t_type {
+                TokenType::Class | TokenType::Fun | TokenType::Var | TokenType::For |
+                TokenType::If | TokenType::While | TokenType::Print | TokenType::Return => {
+                    return;
+                },
+                _ => {}
+            }
+
+            self.advance();
+        }
+    }
+
 }
 
 impl Parser{
 
-    fn expression(&mut self) -> Expr {
+    fn expression(&mut self) -> Result<Expr, RloxError> {
         self.equality()
     }
 
-    fn equality(&mut self) -> Expr {
-        let mut expr = self.comparison();
+    fn equality(&mut self) -> Result<Expr, RloxError> {
+        let mut expr = self.comparison()?;
 
         while self.match_token(vec![TokenType::BangEqual, TokenType::EqualEqual]) {
             let operator = self.previous().clone();
-            let right = self.comparison();
+            let right = self.comparison()?;
             expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
         };
 
-        expr
+        Ok(expr)
     }
 
-    fn comparison(&mut self) -> Expr {
-        let mut expr = self.term();
+    fn comparison(&mut self) -> Result<Expr, RloxError> {
+        let mut expr = self.term()?;
 
         while self.match_token(vec![TokenType::Greater, TokenType::GreaterEqual, TokenType::Less, TokenType::LessEqual]) {
             let operator = self.previous().clone();
-            let right = self.term();
+            let right = self.term()?;
             expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
         };
 
-        expr
+       Ok(expr)
     }
 
-    fn term(&mut self) -> Expr {
-        let mut expr = self.factor();
+    fn term(&mut self) -> Result<Expr, RloxError> {
+        let mut expr = self.factor()?;
 
         while self.match_token(vec![TokenType::Minus, TokenType::Plus]) {
             let operator = self.previous().clone();
-            let right = self.factor();
+            let right = self.factor()?;
             expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
         };
 
-        expr
+        Ok(expr)
     }
 
-    fn factor(&mut self) -> Expr {
-        let mut expr = self.unary();
+    fn factor(&mut self) -> Result<Expr, RloxError> {
+        let mut expr = self.unary()?;
 
         while self.match_token(vec![TokenType::Slash, TokenType::Star]) {
             let operator = self.previous().clone();
-            let right = self.unary();
+            let right = self.unary()?;
             expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
         };
 
-        expr
+        Ok(expr)
     }
 
-    fn unary(&mut self) -> Expr {
+    fn unary(&mut self) -> Result<Expr, RloxError> {
         if self.match_token(vec![TokenType::Bang, TokenType::Minus]) {
             let operator = self.previous().clone();
-            let right = self.unary();
-            return Expr::Unary(operator, Box::new(right));
+            let right = self.unary()?;
+            return Ok(Expr::Unary(operator, Box::new(right)));
         }
 
         self.primary()
     }
 
-    fn primary(&mut self) -> Expr {
+    fn primary(&mut self) -> Result<Expr, RloxError> {
         match self.peek().t_type {
             TokenType::False => {
                 self.advance();
-                Expr::Literal(LiteralValue::Boolean(false))
+                Ok(Expr::Literal(LiteralValue::Boolean(false)))
             },
             TokenType::True => {
                 self.advance();
-                Expr::Literal(LiteralValue::Boolean(true))
+                Ok(Expr::Literal(LiteralValue::Boolean(true)))
             },
             TokenType::Nil => {
                 self.advance();
-                Expr::Literal(LiteralValue::Nil)
+                Ok(Expr::Literal(LiteralValue::Nil))
             },
             TokenType::Number => {
                 if let Some(Literal::Number(number)) = self.peek().literal {
                     self.advance();
-                    Expr::Literal(LiteralValue::Number(number))
+                    Ok(Expr::Literal(LiteralValue::Number(number)))
                 } else {
                     panic!("Expected number literal, got {:?}", self.peek().literal);
                 }
@@ -160,17 +204,18 @@ impl Parser{
                     match unescape(string) {
                         Some(unescaped) => {
                             self.advance();
-                            Expr::Literal(LiteralValue::String(unescaped))
+                            Ok(Expr::Literal(LiteralValue::String(unescaped)))
                         },
                         None => {
-                            report(RloxError::LexicalError(
+                            report(&RloxError::LexicalError(
                                 self.peek().line,
                                 "Invalid string escape sequence".to_string(),
                                 string.clone(),
                             ));
                             let lit = string.clone();
                             self.advance();
-                            Expr::Literal(LiteralValue::String(lit))
+                            self.had_error = true;
+                            Ok(Expr::Literal(LiteralValue::String(lit)))
                         }
                     }
                 } else {
@@ -179,11 +224,11 @@ impl Parser{
             },
             TokenType::LeftParen => {
                 self.advance();
-                let expr = self.expression();
+                let expr = self.expression()?;
                 self.advance();
-                Expr::Grouping(Box::new(expr))
+                Ok(Expr::Grouping(Box::new(expr)))
             },
-            _ => panic!("Unexpected token: {:?}", self.peek().t_type),
+            _ => Err(self.error("Expected expression")),
         }
     }
 

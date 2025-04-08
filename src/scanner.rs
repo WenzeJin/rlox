@@ -14,6 +14,7 @@ pub struct Scanner {
     current: usize,
     line: usize,
     keywords: HashMap<String, TokenType>,
+    pub had_error: bool,
 }
 
 impl Scanner {
@@ -26,6 +27,7 @@ impl Scanner {
             current: 0,
             line: 1,
             keywords,
+            had_error: false,
         }
     }
 
@@ -104,7 +106,8 @@ impl Scanner {
                 } else if is_alpha(c) {
                     self.identifier();
                 } else {
-                    report(RloxError::LexicalError(self.line, "Unexpected character".to_string(), (c as char).to_string()))
+                    self.had_error = true;
+                    report(&RloxError::LexicalError(self.line, "Unexpected character".to_string(), (c as char).to_string()))
                 }
             },
         };
@@ -172,7 +175,8 @@ impl Scanner {
         }
 
         if self.is_at_end() {
-            report(RloxError::LexicalError(self.line, "Unterminated string".to_string(), self.source[self.start..self.current].to_string()));
+            self.had_error = true;
+            report(&RloxError::LexicalError(self.line, "Unterminated string".to_string(), self.source[self.start..self.current].to_string()));
             return;
         }
 
@@ -195,7 +199,10 @@ impl Scanner {
         }
         match self.source[self.start..self.current].parse::<f64>() {
             Ok(value) => self.add_token_with_lit(TokenType::Number, Literal::Number(value)),
-            Err(_) => report(RloxError::LexicalError(self.line, "Invalid number".to_string(), self.source[self.start..self.current].to_string())),
+            Err(_) => {
+                self.had_error = true;
+                report(&RloxError::LexicalError(self.line, "Invalid number".to_string(), self.source[self.start..self.current].to_string()))
+            },
         }
     }
 

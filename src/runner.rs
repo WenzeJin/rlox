@@ -9,7 +9,7 @@ pub fn run_file(filename: &str) -> Result<(), RloxError> {
     let mut file = File::open(filename)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
-    run_tree_walk(contents)?;
+    run_tree_walk(contents);
     Ok(())
 }
 
@@ -22,16 +22,28 @@ pub fn run_prompt() -> Result<(), RloxError> {
         stdout.flush()?;
         buffer.clear();
         stdin.read_line(&mut buffer)?;
-        run_tree_walk(buffer.clone())?;
+        run_tree_walk(buffer.clone());
     }
 }
 
-fn run_tree_walk(source: String) -> Result<(), RloxError> {
+fn run_tree_walk(source: String) {
     let mut scanner = Scanner::new(source);
     let tokens = scanner.scan_tokens();
+    if scanner.had_error {
+        return;
+    }
     let mut parser = Parser::new(tokens);
-    let expression = parser.parse();
-    let mut printer = pretty_printer::AstPrinter();
-    println!("{}", expression.accept(&mut printer));
-    Ok(())
+    match parser.parse() {
+        Some(expression) => {
+            if parser.had_error {
+                return;
+            }
+            let mut printer = pretty_printer::AstPrinter();
+            println!("{}", expression.accept(&mut printer));
+        }
+        None => {
+            eprintln!("No parse result found. Error occurred during parsing.");
+        }
+    }
+    
 }
