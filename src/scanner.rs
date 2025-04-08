@@ -157,9 +157,16 @@ impl Scanner {
 
 impl Scanner {
     fn string(&mut self) {
-        while self.peek() != b'"' && !self.is_at_end() {
+        let mut escaped = false;
+
+        while (self.peek() != b'"' || escaped) && !self.is_at_end() {
             if self.peek() == b'\n' {
                 self.line += 1;
+            }
+            if self.peek() == b'\\' {
+                escaped = !escaped;
+            } else {
+                escaped = false;
             }
             self.advance();
         }

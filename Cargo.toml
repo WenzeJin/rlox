@@ -7,3 +7,4 @@ description = "Rust implementation of Lox language"
 license = "MIT"
 
 [dependencies]
+unescape = "0.1.0"

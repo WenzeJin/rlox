@@ -3,6 +3,8 @@
 use std::vec;
 
 use crate::ast::{token::*, expr::*};
+use crate::error::{RloxError, report};
+use unescape::unescape;
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -155,9 +157,22 @@ impl Parser{
             },
             TokenType::String => {
                 if let Some(Literal::String(string)) = self.peek().literal.as_ref() {
-                    let string = string.clone();
-                    self.advance();
-                    Expr::Literal(LiteralValue::String(string))
+                    match unescape(string) {
+                        Some(unescaped) => {
+                            self.advance();
+                            Expr::Literal(LiteralValue::String(unescaped))
+                        },
+                        None => {
+                            report(RloxError::LexicalError(
+                                self.peek().line,
+                                "Invalid string escape sequence".to_string(),
+                                string.clone(),
+                            ));
+                            let lit = string.clone();
+                            self.advance();
+                            Expr::Literal(LiteralValue::String(lit))
+                        }
+                    }
                 } else {
                     panic!("Expected string literal, got {:?}", self.peek().literal);
                 }
