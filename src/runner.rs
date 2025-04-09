@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 use crate::error::RloxError;
 use crate::scanner::Scanner;
-use crate::interpreter::Interpreter;
+use crate::interpreter::{self, Interpreter};
 use crate::parser::Parser;
 use crate::ast::*;
 
@@ -35,19 +35,14 @@ fn run_tree_walk(source: String) {
     }
     let mut parser = Parser::new(tokens);
     match parser.parse() {
-        Some(expression) => {
+        Some(program) => {
             if parser.had_error {
                 return;
             }
             let mut printer = pretty_printer::AstPrinter();
-            println!("{}", expression.accept(&mut printer));
+            println!("{}", program.accept(&mut printer));
             let mut interpreter = Interpreter::new();
-            match expression.accept(&mut interpreter) {
-                Ok(value) => println!("{:?}", value),
-                Err(e) => {
-                    eprintln!("Runtime error: {}", e);
-                }
-            }
+            interpreter.interpret(program);
         }
         None => {
             eprintln!("No parse result found. Error occurred during parsing.");

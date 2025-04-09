@@ -7,6 +7,7 @@ pub enum Expr {
     Grouping(Box<Expr>),
     Literal(LiteralValue),
     Unary(Token, Box<Expr>),
+    Variable(Token),
 }
 
 #[derive(Debug, Clone)]
@@ -22,6 +23,7 @@ pub trait Visitor<T> {
     fn visit_grouping_expr(&mut self, expression: &Expr) -> T;
     fn visit_literal_expr(&mut self, value: &LiteralValue) -> T;
     fn visit_unary_expr(&mut self, operator: &Token, right: &Expr) -> T;
+    fn visit_variable_expr(&mut self, name: &Token) -> T;
 }
 
 impl Expr {
@@ -35,6 +37,8 @@ impl Expr {
                 => visitor.visit_literal_expr(value),
             Expr::Unary(operator, right) 
                 => visitor.visit_unary_expr(operator, right),
+            Expr::Variable(name)
+                => visitor.visit_variable_expr(name),
         }
     }
 }

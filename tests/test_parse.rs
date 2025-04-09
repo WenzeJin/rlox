@@ -13,28 +13,28 @@ fn test_expr() {
     let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let expression = parser.parse().unwrap();
+    let expression = parser.parse_expr().unwrap();
     assert_eq!(expression.accept(&mut printer), "(+ 1 (* 2 3))");
 
     let source = "1 + 2 * 3 - 4 / 5";
     let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let expression = parser.parse().unwrap();
+    let expression = parser.parse_expr().unwrap();
     assert_eq!(expression.accept(&mut printer), "(- (+ 1 (* 2 3)) (/ 4 5))");
 
     let source = "-1 + 2";
     let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let expression = parser.parse().unwrap();
+    let expression = parser.parse_expr().unwrap();
     assert_eq!(expression.accept(&mut printer), "(+ (- 1) 2)");
 
     let source = "1 != 3 + 4";
     let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let expression = parser.parse().unwrap();
+    let expression = parser.parse_expr().unwrap();
     assert_eq!(expression.accept(&mut printer), "(!= 1 (+ 3 4))");
 
     // a very complex expression
@@ -42,7 +42,7 @@ fn test_expr() {
     let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let expression = parser.parse().unwrap();
+    let expression = parser.parse_expr().unwrap();
     assert_eq!(expression.accept(&mut printer), "(!= (== (== (== (+ (- 1) (* 2 3)) (/ 4 5)) true) false) nil)");
 
     // a simple string
@@ -50,7 +50,7 @@ fn test_expr() {
     let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let expression = parser.parse().unwrap();
+    let expression = parser.parse_expr().unwrap();
     assert_eq!(expression.accept(&mut printer), "(+ hello world)");
 
     // a string with escape characters
@@ -58,7 +58,7 @@ fn test_expr() {
     let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let expression = parser.parse().unwrap();
+    let expression = parser.parse_expr().unwrap();
     assert_eq!(expression.accept(&mut printer), "(+ hello \"world\" foo)");
 
     // error cases
@@ -66,6 +66,6 @@ fn test_expr() {
     let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let expression = parser.parse();
+    let expression = parser.parse_expr();
     assert!(expression.is_none());
 }

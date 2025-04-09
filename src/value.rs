@@ -8,3 +8,15 @@ pub enum LoxValue {
     Boolean(bool),
     Null,
 }
+
+
+impl ToString for LoxValue {
+    fn to_string(&self) -> String {
+        match self {
+            LoxValue::Number(n) => n.to_string(),
+            LoxValue::String(s) => s.clone(),
+            LoxValue::Boolean(b) => b.to_string(),
+            LoxValue::Null => "nil".to_string(),
+        }
+    }
+}

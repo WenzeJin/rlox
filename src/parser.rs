@@ -2,7 +2,7 @@
 
 use std::vec;
 
-use crate::ast::{token::*, expr::*};
+use crate::ast::{token::*, expr::*, stmt::*};
 use crate::error::{RloxError, report};
 use unescape::unescape;
 
@@ -23,11 +23,15 @@ impl Parser {
 }
 
 impl Parser {
-    pub fn parse(&mut self) -> Option<Expr> {
+    pub fn parse_expr(&mut self) -> Option<Expr> {
         match self.expression() {
             Ok(expr) => Some(expr),
             Err(_e) => None,
         }
+    }
+
+    pub fn parse(&mut self) -> Option<Stmt> {
+        self.statements()
     }
 }
 
@@ -113,6 +117,7 @@ impl Parser {
 
 }
 
+/// Parser methods for parsing expressions
 impl Parser{
 
     fn expression(&mut self) -> Result<Expr, RloxError> {
@@ -191,6 +196,10 @@ impl Parser{
                 self.advance();
                 Ok(Expr::Literal(LiteralValue::Nil))
             },
+            TokenType::Identifier => {
+                let name = self.advance().clone();
+                Ok(Expr::Variable(name))
+            },
             TokenType::Number => {
                 if let Some(Literal::Number(number)) = self.peek().literal {
                     self.advance();
@@ -232,4 +241,65 @@ impl Parser{
         }
     }
 
+}
+
+/// Parser methods for parsing statements
+impl Parser {
+    fn statements(&mut self) -> Option<Stmt> {
+        let mut statements = vec![];
+        while !self.is_at_end() {
+            if let Some(stmt) = self.declaration() {
+                statements.push(stmt);
+            }
+        };
+        Some(Stmt::Block(statements))
+    }
+
+    /// Parses a single declaration.
+    /// Statement is also a declaration, so this method can be used to parse both.
+    /// If the statement is not a declaration, it will return None, not an error.
+    /// If any error occurs, it will return None and synchronize the parser.
+    fn declaration(&mut self) -> Option<Stmt> {
+        match if self.match_token(vec![TokenType::Var]) {
+            self.var_declaration()
+        } else {
+            self.statement()
+        } {
+            Ok(stmt) => Some(stmt),
+            Err(_) => {
+                self.synchronize();
+                None
+            }
+        }
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt, RloxError> {
+        let name = self.consume(TokenType::Identifier, "Expect variable name")?.clone();
+        let mut initializer: Option<Box<Expr>> = None;
+        if self.match_token(vec![TokenType::Equal]) {
+            initializer = Some(Box::new(self.expression()?));
+        }
+        self.consume(TokenType::Semicolon, "Expect ';' after variable declaration")?;
+        Ok(Stmt::Var(name, initializer))
+    }
+
+    fn statement(&mut self) -> Result<Stmt, RloxError> {
+        if self.match_token(vec![TokenType::Print]) {
+            self.print_statement()
+        } else {
+            self.expression_statement()
+        }
+    }
+
+    fn print_statement(&mut self) -> Result<Stmt, RloxError> {
+        let value = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after value")?;
+        Ok(Stmt::Print(Box::new(value)))
+    }
+
+    fn expression_statement(&mut self) -> Result<Stmt, RloxError> {
+        let expr = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after expression")?;
+        Ok(Stmt::Expression(Box::new(expr)))
+    }
 }

@@ -63,7 +63,7 @@ fn test_expr(#[case] source: &str, #[case] expected: LoxValue) {
     let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let expression = parser.parse().unwrap();
+    let expression = parser.parse_expr().unwrap();
     let mut interpreter = Interpreter::new();
     let result = expression.accept(&mut interpreter).unwrap();
     assert_eq!(result, expected);
@@ -84,7 +84,8 @@ fn test_runtime_error(#[case] source: &str) {
     let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let expression = parser.parse().unwrap();
+    let expression = parser.parse_expr().unwrap();
     let mut interpreter = Interpreter::new();
     let _ = expression.accept(&mut interpreter).unwrap(); // should panic
 }
+

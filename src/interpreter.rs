@@ -1,20 +1,40 @@
 
-use crate::ast::expr;
-use crate::value::{self, LoxValue};
+use crate::ast::{expr, stmt};
+use crate::value::{LoxValue};
+use crate::env::Environment;
 use crate::ast::token::{Token, TokenType};
 use crate::error::RloxError;
 
 pub struct Interpreter {
-
+    pub had_error: bool,
+    pub env: Environment,
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
-        Interpreter {}
+        Interpreter {
+            had_error: false,
+            env: Environment::new(),
+        }
+    }
+
+    pub fn interpret(&mut self, program: stmt::Stmt) {
+        self.had_error = false;
+        if let stmt::Stmt::Block(statements) = program {
+            for statement in statements {
+                if let Err(e) = statement.accept(self) {
+                    self.runtime_error(e);
+                }
+            }
+        } else {
+            println!("Input is not a valid program!");
+            self.had_error = true;
+        }
     }
 }
 
 impl Interpreter {
+
 
     fn is_truthy(value: &LoxValue) -> bool {
         match value {
@@ -26,6 +46,11 @@ impl Interpreter {
 }
 
 impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
+
+    fn visit_variable_expr(&mut self, name: &Token) -> Result<LoxValue, RloxError> {
+        self.env.get(&name.lexeme)
+    }
+
     fn visit_literal_expr(&mut self, value: &expr::LiteralValue) -> Result<LoxValue, RloxError> {
         match value {
             expr::LiteralValue::Number(n) => Ok(LoxValue::Number(*n)),
@@ -128,5 +153,49 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
                 Ok(LoxValue::Boolean(lv != rv)),
             _ => Err(RloxError::RuntimeError(operator.line, "Unknown binary operator".to_string(), operator.lexeme.clone()))
         }
+    }
+}
+
+impl Interpreter {
+    fn runtime_error(&mut self, error: RloxError) {
+        match error {
+            RloxError::RuntimeError(line, message, lexeme) => {
+                eprintln!("[line {}] Error: {}: {}", line, message, lexeme);
+                self.had_error = true;
+            }
+            _ => {}
+        }
+    }
+}
+
+
+impl stmt::Visitor<Result<(), RloxError>> for Interpreter {
+
+    fn visit_expression_stmt(&mut self, expression: &expr::Expr) -> Result<(), RloxError> {
+        expression.accept(self)?;
+        Ok(())
+    }
+
+    fn visit_print_stmt(&mut self, expression: &expr::Expr) -> Result<(), RloxError> {
+        let value = expression.accept(self)?;
+        println!("{}", value.to_string());
+        Ok(())
+    }
+
+    fn visit_block_stmt(&mut self, statements: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
+        for statement in statements {
+            statement.accept(self)?;
+        }
+        Ok(())
+    }
+
+    fn visit_var_stmt(&mut self, name: &Token, initializer: &Option<Box<expr::Expr>>) -> Result<(), RloxError> {
+        let value = if let Some(expr) = initializer {
+            expr.as_ref().accept(self)?
+        } else {
+            LoxValue::Null
+        };
+        self.env.define(name.lexeme.clone(), value);
+        Ok(())
     }
 }

@@ -14,6 +14,7 @@
 - Implements the Lox language as described in *Crafting Interpreters*.
 - Easy to build, run, and test using `cargo`.
 - Well tested with unit tests and integration tests.
+- Will support List and Map
 
 ## Usage
 
