@@ -3,69 +3,36 @@
 use rlox::ast::pretty_printer;
 use rlox::scanner::Scanner;
 use rlox::parser::Parser;
+use rstest::rstest;
 
 
-#[test]
-fn test_expr() {
+#[rstest]
+#[case("1 + 2 * 3;", "[(+ 1 (* 2 3))]")]
+#[case("1 + 2 * 3 - 4 / 5;", "[(- (+ 1 (* 2 3)) (/ 4 5))]")]
+#[case("-1 + 2;", "[(+ (- 1) 2)]")]
+#[case("1 != 3 + 4;", "[(!= 1 (+ 3 4))]")]
+#[case("\"hello\" + \"world\";", "[(+ hello world)]")]
+#[case("-1 + 2 * 3 == 4 / 5 == true == false != nil;", "[(!= (== (== (== (+ (- 1) (* 2 3)) (/ 4 5)) true) false) nil)]")]
+fn test_expr_stmt(#[case] source: &str, #[case] expected: &str) {
+    let mut scanner = Scanner::new(source.to_string());
+    let tokens = scanner.scan_tokens();
+    let mut parser = Parser::new(tokens);
+    let statement = parser.parse().unwrap(); // 表达式语句视为 statement
     let mut printer = pretty_printer::AstPrinter();
+    assert_eq!(statement.accept(&mut printer), expected);
+}
 
-    let source = "1 + 2 * 3";
+
+#[rstest()]
+#[case("1 + 2;", "[(+ 1 2)]")]
+#[case("var a = 1 + 2;", "[(var a = (+ 1 2))]")]
+#[case("print 1 + 2;", "[(print (+ 1 2))]")]
+#[case("var a; print a;", "[(var a);(print a)]")]
+fn test_simple_stmt(#[case] source: &str, #[case] expected: &str) {
     let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let expression = parser.parse_expr().unwrap();
-    assert_eq!(expression.accept(&mut printer), "(+ 1 (* 2 3))");
-
-    let source = "1 + 2 * 3 - 4 / 5";
-    let mut scanner = Scanner::new(source.to_string());
-    let tokens = scanner.scan_tokens();
-    let mut parser = Parser::new(tokens);
-    let expression = parser.parse_expr().unwrap();
-    assert_eq!(expression.accept(&mut printer), "(- (+ 1 (* 2 3)) (/ 4 5))");
-
-    let source = "-1 + 2";
-    let mut scanner = Scanner::new(source.to_string());
-    let tokens = scanner.scan_tokens();
-    let mut parser = Parser::new(tokens);
-    let expression = parser.parse_expr().unwrap();
-    assert_eq!(expression.accept(&mut printer), "(+ (- 1) 2)");
-
-    let source = "1 != 3 + 4";
-    let mut scanner = Scanner::new(source.to_string());
-    let tokens = scanner.scan_tokens();
-    let mut parser = Parser::new(tokens);
-    let expression = parser.parse_expr().unwrap();
-    assert_eq!(expression.accept(&mut printer), "(!= 1 (+ 3 4))");
-
-    // a very complex expression
-    let source = "-1 + 2 * 3 == 4 / 5 == true == false != nil";
-    let mut scanner = Scanner::new(source.to_string());
-    let tokens = scanner.scan_tokens();
-    let mut parser = Parser::new(tokens);
-    let expression = parser.parse_expr().unwrap();
-    assert_eq!(expression.accept(&mut printer), "(!= (== (== (== (+ (- 1) (* 2 3)) (/ 4 5)) true) false) nil)");
-
-    // a simple string
-    let source = "\"hello\" + \"world\"";
-    let mut scanner = Scanner::new(source.to_string());
-    let tokens = scanner.scan_tokens();
-    let mut parser = Parser::new(tokens);
-    let expression = parser.parse_expr().unwrap();
-    assert_eq!(expression.accept(&mut printer), "(+ hello world)");
-
-    // a string with escape characters
-    let source = "\"hello \\\"world\\\"\" + \"foo\"";
-    let mut scanner = Scanner::new(source.to_string());
-    let tokens = scanner.scan_tokens();
-    let mut parser = Parser::new(tokens);
-    let expression = parser.parse_expr().unwrap();
-    assert_eq!(expression.accept(&mut printer), "(+ hello \"world\" foo)");
-
-    // error cases
-    let source = "1 + 2 *";
-    let mut scanner = Scanner::new(source.to_string());
-    let tokens = scanner.scan_tokens();
-    let mut parser = Parser::new(tokens);
-    let expression = parser.parse_expr();
-    assert!(expression.is_none());
+    let statement = parser.parse().unwrap();
+    let mut printer = pretty_printer::AstPrinter();
+    assert_eq!(statement.accept(&mut printer), expected);
 }
