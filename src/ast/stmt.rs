@@ -2,25 +2,26 @@
 
 use crate::ast::expr::Expr;
 use crate::ast::token::Token;
-use crate::ast::token::TokenType;
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
-    Var(Token, Option<Box<Expr>>),
+    Var(Token, Option<Expr>),
     Block(Vec<Stmt>),
-    Expression(Box<Expr>),
-    Print(Box<Expr>),
+    Expression(Expr),
+    Print(Expr),
 }
 
 pub trait Visitor<T> {
     fn visit_block_stmt(&mut self, statements: &Vec<Stmt>) -> T;
     fn visit_expression_stmt(&mut self, expression: &Expr) -> T;
     fn visit_print_stmt(&mut self, expression: &Expr) -> T;
-    fn visit_var_stmt(&mut self, name: &Token, initializer: &Option<Box<Expr>>) -> T;
+    fn visit_var_stmt(&mut self, name: &Token, initializer: &Option<Expr>) -> T;
 }
 
 impl Stmt {
-    pub fn accept<T>(&self, visitor: &mut dyn Visitor<T>) -> T {
+    pub fn accept<T, V>(&self, visitor: &mut V) -> T
+    where V: Visitor<T>,
+    {
         match self {
             Stmt::Block(statements) 
                 => visitor.visit_block_stmt(statements),

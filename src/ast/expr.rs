@@ -7,6 +7,7 @@ pub enum Expr {
     Grouping(Box<Expr>),
     Literal(LiteralValue),
     Unary(Token, Box<Expr>),
+    Assign(Token, Box<Expr>),
     Variable(Token),
 }
 
@@ -24,10 +25,13 @@ pub trait Visitor<T> {
     fn visit_literal_expr(&mut self, value: &LiteralValue) -> T;
     fn visit_unary_expr(&mut self, operator: &Token, right: &Expr) -> T;
     fn visit_variable_expr(&mut self, name: &Token) -> T;
+    fn visit_assign_expr(&mut self, left: &Token, right: &Expr) -> T;
 }
 
 impl Expr {
-    pub fn accept<T>(&self, visitor: &mut dyn Visitor<T>) -> T {
+    pub fn accept<T, V>(&self, visitor: &mut V) -> T 
+    where V: Visitor<T>,
+    {
         match self {
             Expr::Binary(left, operator, right) 
                 => visitor.visit_binary_expr(left, operator, right),
@@ -39,6 +43,8 @@ impl Expr {
                 => visitor.visit_unary_expr(operator, right),
             Expr::Variable(name)
                 => visitor.visit_variable_expr(name),
+            Expr::Assign(left, right)
+                => visitor.visit_assign_expr(left, right),
         }
     }
 }

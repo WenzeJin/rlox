@@ -58,6 +58,16 @@ impl expr::Visitor<String> for AstPrinter {
     fn visit_variable_expr(&mut self, name: &token::Token) -> String {
         return name.lexeme.clone();
     }
+
+    fn visit_assign_expr(&mut self, left: &token::Token, right: &expr::Expr) -> String {
+        let mut result = String::new();
+        result.push_str("(= ");
+        result.push_str(&left.lexeme);
+        result.push_str(" ");
+        result.push_str(&right.accept(self));
+        result.push_str(")");
+        result
+    }
     
 }
 
@@ -74,7 +84,7 @@ impl stmt::Visitor<String> for AstPrinter {
         self.parenthesize("print", vec![expression])
     }
 
-    fn visit_var_stmt(&mut self, name: &token::Token, initializer: &Option<Box<expr::Expr>>) -> String {
+    fn visit_var_stmt(&mut self, name: &token::Token, initializer: &Option<expr::Expr>) -> String {
         let mut result = String::new();
         result.push_str("(var ");
         result.push_str(&name.lexeme);

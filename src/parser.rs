@@ -121,7 +121,22 @@ impl Parser {
 impl Parser{
 
     fn expression(&mut self) -> Result<Expr, RloxError> {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> Result<Expr, RloxError> {
+        let expr = self.equality()?;
+
+        if self.match_token(vec![TokenType::Equal]) {
+            let value = self.assignment()?;
+            if let Expr::Variable(name) = expr {
+                return Ok(Expr::Assign(name, Box::new(value)));
+            } else {
+                return Err(self.error("Invalid assignment target, requires variable"));
+            }
+        }
+
+        Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expr, RloxError> {
@@ -275,9 +290,10 @@ impl Parser {
 
     fn var_declaration(&mut self) -> Result<Stmt, RloxError> {
         let name = self.consume(TokenType::Identifier, "Expect variable name")?.clone();
-        let mut initializer: Option<Box<Expr>> = None;
+        let mut initializer: Option<Expr> = None;
         if self.match_token(vec![TokenType::Equal]) {
-            initializer = Some(Box::new(self.expression()?));
+            let expression = self.expression()?;
+            initializer = Some(expression);
         }
         self.consume(TokenType::Semicolon, "Expect ';' after variable declaration")?;
         Ok(Stmt::Var(name, initializer))
@@ -294,12 +310,12 @@ impl Parser {
     fn print_statement(&mut self) -> Result<Stmt, RloxError> {
         let value = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value")?;
-        Ok(Stmt::Print(Box::new(value)))
+        Ok(Stmt::Print(value))
     }
 
     fn expression_statement(&mut self) -> Result<Stmt, RloxError> {
         let expr = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after expression")?;
-        Ok(Stmt::Expression(Box::new(expr)))
+        Ok(Stmt::Expression(expr))
     }
 }

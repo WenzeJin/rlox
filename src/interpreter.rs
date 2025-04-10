@@ -1,6 +1,6 @@
 
 use crate::ast::{expr, stmt};
-use crate::value::{LoxValue};
+use crate::value::LoxValue;
 use crate::env::Environment;
 use crate::ast::token::{Token, TokenType};
 use crate::error::RloxError;
@@ -48,7 +48,13 @@ impl Interpreter {
 impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
 
     fn visit_variable_expr(&mut self, name: &Token) -> Result<LoxValue, RloxError> {
-        self.env.get(&name.lexeme)
+        self.env.get(&name)
+    }
+
+    fn visit_assign_expr(&mut self, left: &Token, right: &expr::Expr) -> Result<LoxValue, RloxError> {
+        let value = right.accept(self)?;
+        self.env.assign(left, value.clone())?;
+        Ok(value)
     }
 
     fn visit_literal_expr(&mut self, value: &expr::LiteralValue) -> Result<LoxValue, RloxError> {
@@ -189,13 +195,13 @@ impl stmt::Visitor<Result<(), RloxError>> for Interpreter {
         Ok(())
     }
 
-    fn visit_var_stmt(&mut self, name: &Token, initializer: &Option<Box<expr::Expr>>) -> Result<(), RloxError> {
+    fn visit_var_stmt(&mut self, name: &Token, initializer: &Option<expr::Expr>) -> Result<(), RloxError> {
         let value = if let Some(expr) = initializer {
-            expr.as_ref().accept(self)?
+            expr.accept(self)?
         } else {
             LoxValue::Null
         };
-        self.env.define(name.lexeme.clone(), value);
+        self.env.define(&name.lexeme, value);
         Ok(())
     }
 }

@@ -13,6 +13,8 @@ use rstest::rstest;
 #[case("1 != 3 + 4;", "[(!= 1 (+ 3 4))]")]
 #[case("\"hello\" + \"world\";", "[(+ hello world)]")]
 #[case("-1 + 2 * 3 == 4 / 5 == true == false != nil;", "[(!= (== (== (== (+ (- 1) (* 2 3)) (/ 4 5)) true) false) nil)]")]
+#[case("var a; a = 1 + 2 + b * (c = d);", "[(var a);(= a (+ (+ 1 2) (* b (group (= c d)))))]")]
+#[case::assignment_right_associative("a = b = c = d;", "[(= a (= b (= c d)))]")]
 fn test_expr_stmt(#[case] source: &str, #[case] expected: &str) {
     let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();
