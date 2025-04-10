@@ -1,0 +1,8 @@
+var a = 1;
+var b = 2;
+var c = 2 * a + b;
+print c;
+var d = "hello";
+var e = "world";
+print d + " " + e;
+

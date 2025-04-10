@@ -31,7 +31,7 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Option<Stmt> {
-        self.statements()
+        self.program()
     }
 }
 
@@ -260,14 +260,26 @@ impl Parser{
 
 /// Parser methods for parsing statements
 impl Parser {
-    fn statements(&mut self) -> Option<Stmt> {
+
+    fn program(&mut self) -> Option<Stmt> {
         let mut statements = vec![];
         while !self.is_at_end() {
             if let Some(stmt) = self.declaration() {
                 statements.push(stmt);
             }
         };
-        Some(Stmt::Block(statements))
+        Some(Stmt::Program(statements))
+    }
+
+    fn block(&mut self) -> Result<Stmt, RloxError> {
+        let mut statements = vec![];
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            if let Some(stmt) = self.declaration() {
+                statements.push(stmt);
+            }
+        };
+        self.consume(TokenType::RightBrace, "Expect '}' after block")?;
+        Ok(Stmt::Block(statements))
     }
 
     /// Parses a single declaration.
@@ -302,6 +314,8 @@ impl Parser {
     fn statement(&mut self) -> Result<Stmt, RloxError> {
         if self.match_token(vec![TokenType::Print]) {
             self.print_statement()
+        } else if self.match_token(vec![TokenType::LeftBrace]) {
+            self.block()
         } else {
             self.expression_statement()
         }

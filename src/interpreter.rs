@@ -20,11 +20,9 @@ impl Interpreter {
 
     pub fn interpret(&mut self, program: stmt::Stmt) {
         self.had_error = false;
-        if let stmt::Stmt::Block(statements) = program {
-            for statement in statements {
-                if let Err(e) = statement.accept(self) {
-                    self.runtime_error(e);
-                }
+        if let stmt::Stmt::Program(_) = program {
+            if let Err(e) = program.accept(self) {
+                self.runtime_error(e);
             }
         } else {
             println!("Input is not a valid program!");
@@ -188,10 +186,19 @@ impl stmt::Visitor<Result<(), RloxError>> for Interpreter {
         Ok(())
     }
 
-    fn visit_block_stmt(&mut self, statements: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
+    fn visit_program_stmt(&mut self, statements: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
         for statement in statements {
             statement.accept(self)?;
         }
+        Ok(())
+    }
+
+    fn visit_block_stmt(&mut self, statements: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
+        self.env.enter_scope();
+        for statement in statements {
+            statement.accept(self)?;
+        }
+        self.env.exit_scope();
         Ok(())
     }
 

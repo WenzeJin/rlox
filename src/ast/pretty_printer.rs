@@ -72,8 +72,12 @@ impl expr::Visitor<String> for AstPrinter {
 }
 
 impl stmt::Visitor<String> for AstPrinter {
-    fn visit_block_stmt(&mut self, statements: &Vec<stmt::Stmt>) -> String {
-        self.block(statements)
+    fn visit_block_stmt(&mut self, declarations: &Vec<stmt::Stmt>) -> String {
+        self.block(declarations)
+    }
+
+    fn visit_program_stmt(&mut self, declarations: &Vec<stmt::Stmt>) -> String {
+        self.block(declarations)
     }
 
     fn visit_expression_stmt(&mut self, expression: &expr::Expr) -> String {
