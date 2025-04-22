@@ -11,3 +11,4 @@ unescape = "0.1.0"
 
 [dev-dependencies]
 rstest = "0.18"
+walkdir = "2"

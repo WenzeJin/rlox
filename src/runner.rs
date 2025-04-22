@@ -4,7 +4,6 @@ use crate::error::RloxError;
 use crate::scanner::Scanner;
 use crate::interpreter::Interpreter;
 use crate::parser::Parser;
-use crate::ast::*;
 
 pub fn run_file(filename: &str) -> Result<(), RloxError> {
     let mut file = File::open(filename)?;
@@ -44,8 +43,6 @@ fn run_tree_walk(source: String) {
             if parser.had_error {
                 return;
             }
-            let mut printer = pretty_printer::AstPrinter();
-            println!("{}", program.accept(&mut printer));
             let mut interpreter = Interpreter::new();
             interpreter.interpret(program);
         }

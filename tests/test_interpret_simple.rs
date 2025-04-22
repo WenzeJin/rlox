@@ -3,7 +3,6 @@
 use rlox::value::LoxValue;
 use rlox::scanner::Scanner;
 use rlox::parser::Parser;
-use rlox::ast::*;
 use rlox::interpreter::Interpreter;
 
 use rstest::rstest;
