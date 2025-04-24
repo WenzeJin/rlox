@@ -6,3 +6,4 @@ pub mod parser;
 pub mod value;
 pub mod interpreter;
 pub mod env;
+pub mod builtin;

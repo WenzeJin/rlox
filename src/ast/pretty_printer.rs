@@ -72,6 +72,18 @@ impl expr::Visitor<String> for AstPrinter {
         result.push_str(")");
         result
     }
+
+    fn visit_call_expr(&mut self, callee: &expr::Expr, arguments: &[expr::Expr]) -> String {
+        let mut result = String::new();
+        result.push_str("(call ");
+        result.push_str(&callee.accept(self));
+        for argument in arguments {
+            result.push_str(" ");
+            result.push_str(&argument.accept(self));
+        }
+        result.push_str(")");
+        result
+    }
     
 }
 

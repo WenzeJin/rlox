@@ -1,14 +1,14 @@
 use core::fmt;
 use std::io;
 
-pub static is_oj:bool = false;
+
 
 #[derive(Debug)]
 pub enum RloxError {
     IOError(io::Error),
     LexicalError(usize, String, String),  // line, message, near
     SyntaxError(usize, String, String),   // line, message, near
-    RuntimeError(usize, String, String),  // line, message, near
+    RuntimeError(String, String),  // line, message, near
 }
 
 impl From<io::Error> for RloxError {
@@ -23,7 +23,7 @@ impl fmt::Display for RloxError {
             RloxError::IOError(e) => write!(f, "IO Error: {}", e),
             RloxError::LexicalError(line, message, near) => write!(f, "[line {}] Error: {} at '{}'", line, message, near),
             RloxError::SyntaxError(line, message, near) => write!(f, "[line {}] Error: {} at '{}'", line, message, near),
-            RloxError::RuntimeError(line, message, near) => write!(f, "[line {}] Error: {} at '{}'", line, message, near),
+            RloxError::RuntimeError(message, near) => write!(f, "RuntimeError: {} near '{}'", message, near),
         }
     }
 }

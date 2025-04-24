@@ -4,6 +4,7 @@ use crate::value::LoxValue;
 use crate::env::Environment;
 use crate::ast::token::{Token, TokenType};
 use crate::error::RloxError;
+use crate::builtin::register_builtins;
 
 pub struct Interpreter {
     pub had_error: bool,
@@ -12,9 +13,11 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new() -> Interpreter {
+        let mut environment = Environment::new();
+        register_builtins(&mut environment);
         Interpreter {
             had_error: false,
-            env: Environment::new(),
+            env: environment,
         }
     }
 
@@ -75,13 +78,13 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
                 if let LoxValue::Number(n) = rv {
                     Ok(LoxValue::Number(-n))
                 } else {
-                    Err(RloxError::RuntimeError(operator.line, "Operand must be a number".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operand must be a number".to_string(), operator.lexeme.clone()))
                 }
             }
             TokenType::Bang => {
                 Ok(LoxValue::Boolean(!Interpreter::is_truthy(&rv)))
             }
-            _ => Err(RloxError::RuntimeError(operator.line, "Unknown unary operator".to_string(), operator.lexeme.clone())),
+            _ => Err(RloxError::RuntimeError("Unknown unary operator".to_string(), operator.lexeme.clone())),
         }
         
     }
@@ -95,67 +98,67 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
                 match (lv, rv) {
                     (LoxValue::Number(l), LoxValue::Number(r)) => Ok(LoxValue::Number(l + r)),
                     (LoxValue::String(l), LoxValue::String(r)) => Ok(LoxValue::String(format!("{l}{r}"))),
-                    _ => Err(RloxError::RuntimeError(operator.line, "Operands must be two numbers or two strings".to_string(), operator.lexeme.clone()))
+                    _ => Err(RloxError::RuntimeError("Operands must be two numbers or two strings".to_string(), operator.lexeme.clone()))
                 }
             }
             TokenType::Minus => {
                 if let (LoxValue::Number(l), LoxValue::Number(r)) = (lv, rv) {
                     Ok(LoxValue::Number(l - r))
                 } else {
-                    Err(RloxError::RuntimeError(operator.line, "Operands must be numbers".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operands must be numbers".to_string(), operator.lexeme.clone()))
                 }
             }
             TokenType::Star => {
                 if let (LoxValue::Number(l), LoxValue::Number(r)) = (lv, rv) {
                     Ok(LoxValue::Number(l * r))
                 } else {
-                    Err(RloxError::RuntimeError(operator.line, "Operands must be numbers".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operands must be numbers".to_string(), operator.lexeme.clone()))
                 }
             }
             TokenType::Slash => {
                 if let (LoxValue::Number(l), LoxValue::Number(r)) = (lv, rv) {
                     if r == 0.0 {
-                        Err(RloxError::RuntimeError(operator.line, "Division by zero".to_string(), operator.lexeme.clone()))
+                        Err(RloxError::RuntimeError("Division by zero".to_string(), operator.lexeme.clone()))
                     } else {
                         Ok(LoxValue::Number(l / r))
                     }
                 } else {
-                    Err(RloxError::RuntimeError(operator.line, "Operands must be numbers".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operands must be numbers".to_string(), operator.lexeme.clone()))
                 }
             }
             TokenType::Greater => {
                 if let (LoxValue::Number(l), LoxValue::Number(r)) = (lv, rv) {
                     Ok(LoxValue::Boolean(l > r))
                 } else {
-                    Err(RloxError::RuntimeError(operator.line, "Operands must be numbers".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operands must be numbers".to_string(), operator.lexeme.clone()))
                 }
             }
             TokenType::GreaterEqual => {
                 if let (LoxValue::Number(l), LoxValue::Number(r)) = (lv, rv) {
                     Ok(LoxValue::Boolean(l >= r))
                 } else {
-                    Err(RloxError::RuntimeError(operator.line, "Operands must be numbers".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operands must be numbers".to_string(), operator.lexeme.clone()))
                 }
             }
             TokenType::Less => {
                 if let (LoxValue::Number(l), LoxValue::Number(r)) = (lv, rv) {
                     Ok(LoxValue::Boolean(l < r))
                 } else {
-                    Err(RloxError::RuntimeError(operator.line, "Operands must be numbers".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operands must be numbers".to_string(), operator.lexeme.clone()))
                 }
             }
             TokenType::LessEqual => {
                 if let (LoxValue::Number(l), LoxValue::Number(r)) = (lv, rv) {
                     Ok(LoxValue::Boolean(l <= r))
                 } else {
-                    Err(RloxError::RuntimeError(operator.line, "Operands must be numbers".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operands must be numbers".to_string(), operator.lexeme.clone()))
                 }
             }
             TokenType::EqualEqual => 
                 Ok(LoxValue::Boolean(lv == rv)),
             TokenType::BangEqual => 
                 Ok(LoxValue::Boolean(lv != rv)),
-            _ => Err(RloxError::RuntimeError(operator.line, "Unknown binary operator".to_string(), operator.lexeme.clone()))
+            _ => Err(RloxError::RuntimeError("Unknown binary operator".to_string(), operator.lexeme.clone()))
         }
     }
 
@@ -176,7 +179,23 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
                     Ok(lv)
                 }
             }
-            _ => Err(RloxError::RuntimeError(operator.line, "Unknown logical operator".to_string(), operator.lexeme.clone()))
+            _ => Err(RloxError::RuntimeError("Unknown logical operator".to_string(), operator.lexeme.clone()))
+        }
+    }
+
+    fn visit_call_expr(&mut self, callee: &expr::Expr, arguments: &[expr::Expr]) -> Result<LoxValue, RloxError> {
+        let callee_value = callee.accept(self)?;
+        if let LoxValue::Callable(method) = callee_value {
+            let mut arg_values = Vec::new();
+            for arg in arguments {
+                arg_values.push(arg.accept(self)?);
+            }
+            if arg_values.len() != method.arity() as usize {
+                return Err(RloxError::RuntimeError(format!("Expected {} arguments but got {}", method.arity(), arg_values.len()), String::new()));
+            }
+            method.invoke(self, arg_values)
+        } else {
+            Err(RloxError::RuntimeError("Can only call functions and classes!".to_string(), String::new()))
         }
     }
 }
@@ -184,8 +203,8 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
 impl Interpreter {
     fn runtime_error(&mut self, error: RloxError) {
         match error {
-            RloxError::RuntimeError(line, message, lexeme) => {
-                eprintln!("[line {}] Error: {}: {}", line, message, lexeme);
+            RloxError::RuntimeError(message, lexeme) => {
+                eprintln!("RuntimeError: {}: {}", message, lexeme);
                 self.had_error = true;
             }
             _ => {}

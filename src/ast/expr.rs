@@ -10,6 +10,8 @@ pub enum Expr {
     Unary(Token, Box<Expr>),
     Assign(Token, Box<Expr>),
     Variable(Token),
+    Call(Box<Expr>, Vec<Expr>, usize), // (callee, arguments, line)
+
 }
 
 #[derive(Debug, Clone)]
@@ -28,6 +30,7 @@ pub trait Visitor<T> {
     fn visit_unary_expr(&mut self, operator: &Token, right: &Expr) -> T;
     fn visit_variable_expr(&mut self, name: &Token) -> T;
     fn visit_assign_expr(&mut self, left: &Token, right: &Expr) -> T;
+    fn visit_call_expr(&mut self, callee: &Expr, arguments: &[Expr]) -> T;
 }
 
 impl Expr {
@@ -49,6 +52,8 @@ impl Expr {
                 => visitor.visit_variable_expr(name),
             Expr::Assign(left, right)
                 => visitor.visit_assign_expr(left, right),
+            Expr::Call(callee, arguments, _)
+                => visitor.visit_call_expr(callee, arguments),
         }
     }
 }

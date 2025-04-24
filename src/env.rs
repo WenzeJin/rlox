@@ -1,6 +1,7 @@
 //! Runtime environment
 
 use std::collections::HashMap;
+use std::hash::Hash;
 use crate::value::LoxValue;
 use crate::error::RloxError;
 use crate::ast::token::Token;
@@ -64,27 +65,27 @@ impl Environment {
 
     pub fn get(&self, name: &Token) -> Result<LoxValue, RloxError> {
         if name.t_type != TokenType::Identifier {
-            return Err(RloxError::RuntimeError(name.line, "Invalid token type".to_string(), name.lexeme.clone()));
+            return Err(RloxError::RuntimeError("Invalid token type".to_string(), name.lexeme.clone()));
         }
         match Self::get_helper(&self.values, &name.lexeme) {
             Some(value) => Ok(value),
-            None => Err(RloxError::RuntimeError(name.line, "Undefined variable".to_string(), name.lexeme.clone())),
+            None => Err(RloxError::RuntimeError("Undefined variable".to_string(), name.lexeme.clone())),
         }
     }
 
     fn get_mut(&mut self, name: &Token) -> Result<&mut LoxValue, RloxError> {
         if name.t_type != TokenType::Identifier {
-            return Err(RloxError::RuntimeError(name.line, "Invalid token type".to_string(), name.lexeme.clone()));
+            return Err(RloxError::RuntimeError("Invalid token type".to_string(), name.lexeme.clone()));
         }
         match Self::get_mut_helper(&mut self.values, &name.lexeme) {
             Some(value) => Ok(value),
-            None => Err(RloxError::RuntimeError(name.line, "Undefined variable".to_string(), name.lexeme.clone())),
+            None => Err(RloxError::RuntimeError("Undefined variable".to_string(), name.lexeme.clone())),
         }
     }
     
     pub fn assign(&mut self, name: &Token, value: LoxValue) -> Result<(), RloxError> {
         if name.t_type != TokenType::Identifier {
-            return Err(RloxError::RuntimeError(name.line, "Invalid token type".to_string(), name.lexeme.clone()));
+            return Err(RloxError::RuntimeError("Invalid token type".to_string(), name.lexeme.clone()));
         }
         match self.get_mut(name) {
             Ok(old_value) => {

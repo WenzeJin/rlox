@@ -118,7 +118,7 @@ impl Parser {
 }
 
 /// Parser methods for parsing expressions
-impl Parser{
+impl Parser {
 
     fn expression(&mut self) -> Result<Expr, RloxError> {
         self.assignment()
@@ -218,7 +218,41 @@ impl Parser{
             return Ok(Expr::Unary(operator, Box::new(right)));
         }
 
-        self.primary()
+        self.call()
+    }
+
+    fn call(&mut self) -> Result<Expr, RloxError> {
+        // call -> primary ( '(' arguments? ')' )*
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.match_token(vec![TokenType::LeftParen]) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> Result<Expr, RloxError> {
+        let mut arguments = vec![];
+
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if arguments.len() >= 255 {
+                    return Err(self.error("Cannot have more than 255 arguments"));
+                }
+                arguments.push(self.expression()?);
+                if !self.match_token(vec![TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        self.consume(TokenType::RightParen, "Expect ')' after arguments")?;
+        Ok(Expr::Call(Box::new(callee), arguments, self.previous().line))
     }
 
     fn primary(&mut self) -> Result<Expr, RloxError> {
