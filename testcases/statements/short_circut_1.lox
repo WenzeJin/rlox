@@ -1,0 +1,11 @@
+var flag = 0;
+var a = 1;
+var b = 2;
+print a == 1 and (flag = 1);
+print flag;
+print b == 2 or (flag = 2);
+print flag;
+print a != 1 and (flag = 3);
+print flag;
+print a != 1 or (flag = 4);
+print flag;

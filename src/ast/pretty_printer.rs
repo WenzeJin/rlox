@@ -37,6 +37,10 @@ impl expr::Visitor<String> for AstPrinter {
     fn visit_binary_expr(&mut self, left: &expr::Expr, operator: &token::Token, right: &expr::Expr) -> String {
         return self.parenthesize(&operator.lexeme, vec![left, right]);
     }
+
+    fn visit_logical_expr(&mut self, left: &expr::Expr, operator: &token::Token, right: &expr::Expr) -> String {
+        return self.parenthesize(&operator.lexeme, vec![left, right]);
+    }
     
     fn visit_grouping_expr(&mut self, expression: &expr::Expr) -> String {
         return self.parenthesize("group", vec![expression]);
@@ -96,6 +100,30 @@ impl stmt::Visitor<String> for AstPrinter {
             result.push_str(" = ");
             result.push_str(&expr.accept(self));
         }
+        result.push_str(")");
+        result
+    }
+
+    fn visit_if_stmt(&mut self, condition: &expr::Expr, then_branch: &Box<stmt::Stmt>, else_branch: &Option<Box<stmt::Stmt>>) -> String {
+        let mut result = String::new();
+        result.push_str("(if ");
+        result.push_str(&condition.accept(self));
+        result.push_str(" ");
+        result.push_str(&then_branch.accept(self));
+        if let Some(else_branch) = else_branch {
+            result.push_str(" ");
+            result.push_str(&else_branch.accept(self));
+        }
+        result.push_str(")");
+        result
+    }
+
+    fn visit_while_stmt(&mut self, condition: &expr::Expr, body: &Box<stmt::Stmt>) -> String {
+        let mut result = String::new();
+        result.push_str("(while ");
+        result.push_str(&condition.accept(self));
+        result.push_str(" ");
+        result.push_str(&body.accept(self));
         result.push_str(")");
         result
     }

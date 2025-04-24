@@ -158,6 +158,27 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
             _ => Err(RloxError::RuntimeError(operator.line, "Unknown binary operator".to_string(), operator.lexeme.clone()))
         }
     }
+
+    fn visit_logical_expr(&mut self, left: &expr::Expr, operator: &Token, right: &expr::Expr) -> Result<LoxValue, RloxError> {
+        let lv = left.accept(self)?;
+        match operator.t_type {
+            TokenType::Or => {
+                if Interpreter::is_truthy(&lv) {
+                    Ok(lv)
+                } else {
+                    right.accept(self)
+                }
+            }
+            TokenType::And => {
+                if Interpreter::is_truthy(&lv) {
+                    right.accept(self)
+                } else {
+                    Ok(lv)
+                }
+            }
+            _ => Err(RloxError::RuntimeError(operator.line, "Unknown logical operator".to_string(), operator.lexeme.clone()))
+        }
+    }
 }
 
 impl Interpreter {
@@ -209,6 +230,22 @@ impl stmt::Visitor<Result<(), RloxError>> for Interpreter {
             LoxValue::Null
         };
         self.env.define(&name.lexeme, value);
+        Ok(())
+    }
+
+    fn visit_if_stmt(&mut self, condition: &expr::Expr, then_branch: &Box<stmt::Stmt>, else_branch: &Option<Box<stmt::Stmt>>) -> Result<(), RloxError> {
+        if Interpreter::is_truthy(&condition.accept(self)?) {
+            then_branch.accept(self)?;
+        } else if let Some(else_branch) = else_branch {
+            else_branch.accept(self)?;
+        }
+        Ok(())
+    }
+
+    fn visit_while_stmt(&mut self, condition: &expr::Expr, body: &Box<stmt::Stmt>) -> Result<(), RloxError> {
+        while Interpreter::is_truthy(&condition.accept(self)?) {
+            body.accept(self)?;
+        }
         Ok(())
     }
 }

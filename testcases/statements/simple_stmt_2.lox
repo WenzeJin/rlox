@@ -1,0 +1,8 @@
+var a;
+var b;
+print a;
+print b;
+a = 2;
+b = 9;
+var c = a + b;
+print c;

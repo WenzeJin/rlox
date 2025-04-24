@@ -1,0 +1,14 @@
+var a = 1;
+var c = "outside";
+
+if (a == 1) {
+    var c;
+    c = "a is 1";
+    print c;
+} else {
+    var c;
+    c = "a is not 1";
+}
+
+print c;
+// Expected output: "outside"

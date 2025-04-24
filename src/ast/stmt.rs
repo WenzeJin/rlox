@@ -10,6 +10,8 @@ pub enum Stmt {
     Program(Vec<Stmt>),
     Expression(Expr),
     Print(Expr),
+    If(Expr, Box<Stmt>, Option<Box<Stmt>>),
+    While(Expr, Box<Stmt>),
 }
 
 pub trait Visitor<T> {
@@ -18,6 +20,8 @@ pub trait Visitor<T> {
     fn visit_expression_stmt(&mut self, expression: &Expr) -> T;
     fn visit_print_stmt(&mut self, expression: &Expr) -> T;
     fn visit_var_stmt(&mut self, name: &Token, initializer: &Option<Expr>) -> T;
+    fn visit_if_stmt(&mut self, condition: &Expr, then_branch: &Box<Stmt>, else_branch: &Option<Box<Stmt>>) -> T;
+    fn visit_while_stmt(&mut self, condition: &Expr, body: &Box<Stmt>) -> T;
 }
 
 impl Stmt {
@@ -35,6 +39,10 @@ impl Stmt {
                 => visitor.visit_print_stmt(expression),
             Stmt::Var(name, initializer) => 
                 visitor.visit_var_stmt(name, initializer),
+            Stmt::If(condition, then_branch, else_branch)
+                => visitor.visit_if_stmt(condition, then_branch, else_branch),
+            Stmt::While(condition, body)
+                => visitor.visit_while_stmt(condition, body),
         }
     }
 }

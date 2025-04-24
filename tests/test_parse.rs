@@ -15,6 +15,15 @@ use rstest::rstest;
 #[case("-1 + 2 * 3 == 4 / 5 == true == false != nil;", "[(!= (== (== (== (+ (- 1) (* 2 3)) (/ 4 5)) true) false) nil)]")]
 #[case("var a; a = 1 + 2 + b * (c = d);", "[(var a);(= a (+ (+ 1 2) (* b (group (= c d)))))]")]
 #[case::assignment_right_associative("a = b = c = d;", "[(= a (= b (= c d)))]")]
+#[case("true and false;", "[(and true false)]")]
+#[case("true or false;", "[(or true false)]")]
+#[case("true and false or true;", "[(or (and true false) true)]")]
+#[case("a or b and c;", "[(or a (and b c))]")]
+#[case("a and b or c and d;", "[(or (and a b) (and c d))]")]
+#[case("a and (b or c);", "[(and a (group (or b c)))]")]
+#[case("(a or b) and c;", "[(and (group (or a b)) c)]")]
+#[case("a or b and c or d;", "[(or (or a (and b c)) d)]")]
+#[case("a and !b;", "[(and a (! b))]")]
 fn test_expr_stmt(#[case] source: &str, #[case] expected: &str) {
     let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();

@@ -1,6 +1,7 @@
 use core::fmt;
 use std::io;
-use crate::ast::token::{Token, TokenType};
+
+pub static is_oj:bool = false;
 
 #[derive(Debug)]
 pub enum RloxError {
@@ -29,16 +30,4 @@ impl fmt::Display for RloxError {
 
 pub fn report(e: &RloxError) {
     eprintln!("{}", e);
-}
-
-pub fn report_line(line: usize, place: &str, msg: &str) {
-    eprintln!("[line {}] Error{}: {}", line, place, msg);
-}
-
-pub fn report_token(token: &Token, msg: &str) {
-    if token.t_type == TokenType::EOF {
-        report_line(token.line, " at end", msg);
-    } else {
-        report_line(token.line, &format!(" at '{}'", token.lexeme), msg);
-    }
 }

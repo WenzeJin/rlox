@@ -1,0 +1,28 @@
+// Testcase: Complex if-else control flow with logical operators
+// Expected Output:
+// Branch 1
+// Branch 2
+// Branch 4
+// Done
+
+var a = true;
+var b = false;
+var c = true;
+
+if (a and !b) {
+    print "Branch 1"; // This branch should execute
+    if (b or c) {
+        print "Branch 2"; // This branch should execute
+        if (!(a and b)) {
+            print "Branch 4"; // This branch should execute
+        } else {
+            print "Branch 5"; // This branch should not execute
+        }
+    } else {
+        print "Branch 3"; // This branch should not execute
+    }
+} else {
+    print "Branch 6"; // This branch should not execute
+}
+
+print "Done"; // This should always execute

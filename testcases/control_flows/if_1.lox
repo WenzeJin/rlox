@@ -1,0 +1,28 @@
+// Test case for if-else control flows with simple statements
+// Without logical operators
+
+var x = 10;
+var y = 20;
+
+if (x < y) {
+    print "x is less than y";
+} else {
+    print "x is not less than y";
+}
+
+var a = 5;
+var b = 5;
+
+if (a == b) {
+    print "a is equal to b";
+} else {
+    print "a is not equal to b";
+}
+
+var c = 15;
+
+if (c > 10) {
+    print "c is greater than 10";
+} else {
+    print "c is not greater than 10";
+}

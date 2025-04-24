@@ -4,6 +4,7 @@ use crate::ast::token::Token;
 #[derive(Debug, Clone)]
 pub enum Expr {
     Binary(Box<Expr>, Token, Box<Expr>),
+    Logical(Box<Expr>, Token, Box<Expr>),
     Grouping(Box<Expr>),
     Literal(LiteralValue),
     Unary(Token, Box<Expr>),
@@ -21,6 +22,7 @@ pub enum LiteralValue {
 
 pub trait Visitor<T> {
     fn visit_binary_expr(&mut self, left: &Expr, operator: &Token, right: &Expr) -> T;
+    fn visit_logical_expr(&mut self, left: &Expr, operator: &Token, right: &Expr) -> T;
     fn visit_grouping_expr(&mut self, expression: &Expr) -> T;
     fn visit_literal_expr(&mut self, value: &LiteralValue) -> T;
     fn visit_unary_expr(&mut self, operator: &Token, right: &Expr) -> T;
@@ -35,6 +37,8 @@ impl Expr {
         match self {
             Expr::Binary(left, operator, right) 
                 => visitor.visit_binary_expr(left, operator, right),
+            Expr::Logical(left, operator, right)
+                => visitor.visit_logical_expr(left, operator, right),
             Expr::Grouping(expression) 
                 => visitor.visit_grouping_expr(expression),
             Expr::Literal(value) 

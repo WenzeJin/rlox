@@ -125,7 +125,7 @@ impl Parser{
     }
 
     fn assignment(&mut self) -> Result<Expr, RloxError> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         if self.match_token(vec![TokenType::Equal]) {
             let value = self.assignment()?;
@@ -135,6 +135,30 @@ impl Parser{
                 return Err(self.error("Invalid assignment target, requires variable"));
             }
         }
+
+        Ok(expr)
+    }
+
+    fn or(&mut self) -> Result<Expr, RloxError> {
+        let mut expr = self.and()?;
+
+        while self.match_token(vec![TokenType::Or]) {
+            let operator = self.previous().clone();
+            let right = self.and()?;
+            expr = Expr::Logical(Box::new(expr), operator, Box::new(right));
+        };
+
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> Result<Expr, RloxError> {
+        let mut expr = self.equality()?;
+
+        while self.match_token(vec![TokenType::And]) {
+            let operator = self.previous().clone();
+            let right = self.equality()?;
+            expr = Expr::Logical(Box::new(expr), operator, Box::new(right));
+        };
 
         Ok(expr)
     }
@@ -316,6 +340,12 @@ impl Parser {
             self.print_statement()
         } else if self.match_token(vec![TokenType::LeftBrace]) {
             self.block()
+        } else if self.match_token(vec![TokenType::If]) {
+            self.if_statement() 
+        } else if self.match_token(vec![TokenType::While]) {
+            self.while_statement()
+        } else if self.match_token(vec![TokenType::For]) {
+            self.for_statement()
         } else {
             self.expression_statement()
         }
@@ -331,5 +361,74 @@ impl Parser {
         let expr = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after expression")?;
         Ok(Stmt::Expression(expr))
+    }
+
+    fn if_statement(&mut self) -> Result<Stmt, RloxError> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'")?;
+        let condition = self.expression()?;
+        self.consume(TokenType::RightParen, "Expect ')' after if condition")?;
+        let then_branch = self.statement()?;
+        let else_branch = if self.match_token(vec![TokenType::Else]) {
+            Some(Box::new(self.statement()?))
+        } else {
+            None
+        };
+        Ok(Stmt::If(condition, Box::new(then_branch), else_branch))
+    }
+
+    fn while_statement(&mut self) -> Result<Stmt, RloxError> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'while'")?;
+        let condition = self.expression()?;
+        self.consume(TokenType::RightParen, "Expect ')' after while condition")?;
+        let body = self.statement()?;
+        Ok(Stmt::While(condition, Box::new(body)))
+    }
+
+    fn for_statement(&mut self) -> Result<Stmt, RloxError> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'for'")?;
+        let initializer = if self.match_token(vec![TokenType::Var]) {
+            Some(self.var_declaration()?)
+        } else if self.match_token(vec![TokenType::Semicolon]) {
+            None
+        } else {
+            Some(self.expression_statement()?)
+        };
+
+        let mut condition: Option<Expr> = None;
+        if !self.check(TokenType::Semicolon) {
+            condition = Some(self.expression()?);
+        }
+        self.consume(TokenType::Semicolon, "Expect ';' after loop condition")?;
+
+        let mut increment: Option<Expr> = None;
+        if !self.check(TokenType::RightParen) {
+            increment = Some(self.expression()?);
+        }
+        self.consume(TokenType::RightParen, "Expect ')' after for clauses")?;
+
+        let mut body = self.statement()?;
+
+        // insert increment statement at the end of the body
+        if let Some(increment) = increment {
+            if let Stmt::Block(ref mut block) = body {
+                block.push(Stmt::Expression(increment));
+            } else {
+                body = Stmt::Block(vec![body, Stmt::Expression(increment)]);
+            }
+        }
+
+        // first build the inner while
+        let while_body = Stmt::While(
+            condition.unwrap_or(Expr::Literal(LiteralValue::Boolean(true))), // if no condition, loop forever
+            Box::new(body),
+        );
+
+        // then build the outer block
+        let mut block: Vec<Stmt> = vec![];
+        if let Some(inner) = initializer {
+            block.push(inner);
+        }
+        block.push(while_body);
+        Ok(Stmt::Block(block))
     }
 }
