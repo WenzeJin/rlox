@@ -21,6 +21,16 @@ impl Interpreter {
         }
     }
 
+    pub fn from_env(env: Environment) -> Interpreter {
+        Interpreter {
+            had_error: false,
+            env,
+        }
+    }
+
+    /// If the program is a valid program, it will be interpreted. <br>
+    /// If you want to interpret and handle any error that may occur, use this function. <br>
+    /// Otherwise, use visitor pattern, which means stmt.accept(self) <br>
     pub fn interpret(&mut self, program: stmt::Stmt) {
         self.had_error = false;
         if let stmt::Stmt::Program(_) = program {

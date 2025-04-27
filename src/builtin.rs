@@ -4,11 +4,18 @@ use crate::value::{LoxCallable, LoxValue};
 use crate::env::Environment;
 use crate::error::RloxError;
 
+/// Macros to initialize built-in functions
+macro_rules! init_builtin {
+    ($env:expr, $name:expr, $arity:expr, $impl:expr) => {
+        $env.define_globally($name, LoxValue::Callable(LoxCallable::BuiltInFunction($arity, $impl)));
+    };
+}
+
 
 pub fn register_builtins(env: &mut Environment) {
-    env.define("clock", LoxValue::Callable(LoxCallable::BuiltInFunction(0, clock_impl)));
-    env.define("input", LoxValue::Callable(LoxCallable::BuiltInFunction(0, input_impl)));
-    env.define("parseNumber", LoxValue::Callable(LoxCallable::BuiltInFunction(1, parse_number_impl)));
+    init_builtin!(env, "clock", 0, clock_impl);
+    init_builtin!(env, "input", 0, input_impl);
+    init_builtin!(env, "parseNumber", 1, parse_number_impl);
 }
 
 fn clock_impl(_args: Vec<LoxValue>) -> Result<LoxValue, RloxError> {

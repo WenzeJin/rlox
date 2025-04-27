@@ -3,6 +3,9 @@
 use crate::error::RloxError;
 use crate::interpreter::Interpreter;
 use crate::ast::stmt::Stmt;
+use std::cell::RefCell;
+use std::rc::Rc;
+use crate::env::{EnvItem, Environment};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LoxValue {
@@ -15,8 +18,13 @@ pub enum LoxValue {
 
 #[derive(Debug, Clone)]
 pub enum LoxCallable {
-    UserFunction(Vec<String>, Box<Stmt>),      // (Parameters, Body)
     BuiltInFunction(u32, fn(Vec<LoxValue>) -> Result<LoxValue, RloxError>),     // (Arity, Function)
+    UserFunction {
+        def_name: String,
+        params: Vec<String>,
+        body: Rc<Stmt>,
+        closure: Rc<RefCell<EnvItem>>,  // Environment of this function
+    },
 }
 
 impl ToString for LoxValue {
@@ -34,7 +42,7 @@ impl ToString for LoxValue {
 impl LoxCallable {
     pub fn arity (&self) -> u32 {
         match self {
-            LoxCallable::UserFunction(params, _) => params.len() as u32,
+            LoxCallable::UserFunction { params, .. } => params.len() as u32,
             LoxCallable::BuiltInFunction(arity, _) => *arity,
         }
     }
@@ -44,9 +52,37 @@ impl LoxCallable {
             panic!("Arity should be checked before invoking");
         }
         match self {
-            LoxCallable::UserFunction(params, body) => {
-                // invoke user defined function
-                Ok(LoxValue::Null)
+            LoxCallable::UserFunction { def_name, params, body, closure } => {
+                // create a new environment for the function call
+                let global = interpreter.env.global.clone();
+                let closure = closure.clone();
+                let env = Environment::from(global, closure);
+                let mut interpreter = Interpreter::from_env(env);
+                // enter a new scope
+                interpreter.env.enter_scope();
+                // bind parameters to arguments
+                for (param, arg) in params.iter().zip(arguments.iter()) {
+                    interpreter.env.define(param, arg.clone());
+                }
+                // evaluate the function body
+                let result = body.accept(&mut interpreter);
+                // exit the scope
+                interpreter.env.exit_scope();
+                // return the result
+                // if the result is a return statement, return the value
+                match result {
+                    Ok(_) => {
+                        Ok(LoxValue::Null)
+                    },
+                    Err(RloxError::ReturnValue(value)) => {
+                        // return the value
+                        Ok(value)
+                    },
+                    Err(e) => {
+                        // return the error
+                        Err(e)
+                    }
+                }
             },
             LoxCallable::BuiltInFunction(_, implementation) => {
                 // invoke built-in function
