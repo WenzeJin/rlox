@@ -7,3 +7,4 @@ pub mod value;
 pub mod interpreter;
 pub mod env;
 pub mod builtin;
+pub mod resolver;

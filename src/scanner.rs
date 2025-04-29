@@ -4,7 +4,7 @@
 //! Author: Wenze Jin
 
 use std::collections::HashMap;
-use crate::ast::token::{Token, TokenType, Literal};
+use crate::ast::token::{Token, TokenType};
 use crate::error::{RloxError, report};
 
 pub struct Scanner {
@@ -38,7 +38,7 @@ impl Scanner {
         }
 
         // push EOF token
-        self.tokens.push(Token::new(TokenType::EOF, "".to_string(), None, self.line));
+        self.tokens.push(Token::new(TokenType::EOF, "".to_string(), self.line));
         
         std::mem::take(&mut self.tokens)
     }
@@ -115,12 +115,7 @@ impl Scanner {
 
     fn add_token(&mut self, t_type: TokenType) {
         let text = self.source[self.start..self.current].to_string();
-        self.tokens.push(Token::new(t_type, text, None, self.line));
-    }
-
-    fn add_token_with_lit(&mut self, t_type: TokenType, literal: Literal) {
-        let text = self.source[self.start..self.current].to_string();
-        self.tokens.push(Token::new(t_type, text, Some(literal), self.line));
+        self.tokens.push(Token::new(t_type, text, self.line));
     }
 
     fn advance(&mut self) -> u8 {
@@ -183,8 +178,7 @@ impl Scanner {
         // closing quote
         self.advance();
 
-        let value = self.source[self.start + 1..self.current - 1].to_string();
-        self.add_token_with_lit(TokenType::String, Literal::String(value));
+        self.add_token(TokenType::String);
     }
 
     fn number(&mut self) {
@@ -198,7 +192,7 @@ impl Scanner {
             }
         }
         match self.source[self.start..self.current].parse::<f64>() {
-            Ok(value) => self.add_token_with_lit(TokenType::Number, Literal::Number(value)),
+            Ok(_) => self.add_token(TokenType::Number),
             Err(_) => {
                 self.had_error = true;
                 report(&RloxError::LexicalError(self.line, "Invalid number".to_string(), self.source[self.start..self.current].to_string()))

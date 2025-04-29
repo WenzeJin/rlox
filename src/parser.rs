@@ -1,6 +1,7 @@
 //! This module contains the parser for the language.
 
 use std::vec;
+use std::rc::Rc;
 
 use crate::ast::{token::*, expr::*, stmt::*};
 use crate::error::{RloxError, report};
@@ -271,37 +272,33 @@ impl Parser {
             },
             TokenType::Identifier => {
                 let name = self.advance().clone();
-                Ok(Expr::Variable(name))
+                Ok(Expr::Variable(Rc::new(name)))
             },
             TokenType::Number => {
-                if let Some(Literal::Number(number)) = self.peek().literal {
-                    self.advance();
-                    Ok(Expr::Literal(LiteralValue::Number(number)))
-                } else {
-                    panic!("Expected number literal, got {:?}", self.peek().literal);
-                }
+                let lexeme = self.peek().lexeme.clone();
+                let number = lexeme.parse::<f64>().unwrap();
+                self.advance();
+                Ok(Expr::Literal(LiteralValue::Number(number)))
             },
             TokenType::String => {
-                if let Some(Literal::String(string)) = self.peek().literal.as_ref() {
-                    match unescape(string) {
-                        Some(unescaped) => {
-                            self.advance();
-                            Ok(Expr::Literal(LiteralValue::String(unescaped)))
-                        },
-                        None => {
-                            report(&RloxError::LexicalError(
-                                self.peek().line,
-                                "Invalid string escape sequence".to_string(),
-                                string.clone(),
-                            ));
-                            let lit = string.clone();
-                            self.advance();
-                            self.had_error = true;
-                            Ok(Expr::Literal(LiteralValue::String(lit)))
-                        }
+                let lexeme = self.peek().lexeme.clone();
+                let string = lexeme[1..lexeme.len()-1].to_string();
+                match unescape(&string) {
+                    Some(unescaped) => {
+                        self.advance();
+                        Ok(Expr::Literal(LiteralValue::String(unescaped)))
+                    },
+                    None => {
+                        report(&RloxError::LexicalError(
+                            self.peek().line,
+                            "Invalid string escape sequence".to_string(),
+                            string.clone(),
+                        ));
+                        let lit = string.clone();
+                        self.advance();
+                        self.had_error = true;
+                        Ok(Expr::Literal(LiteralValue::String(lit)))
                     }
-                } else {
-                    panic!("Expected string literal, got {:?}", self.peek().literal);
                 }
             },
             TokenType::LeftParen => {
@@ -380,6 +377,10 @@ impl Parser {
             self.while_statement()
         } else if self.match_token(vec![TokenType::For]) {
             self.for_statement()
+        } else if self.match_token(vec![TokenType::Fun]) {
+            self.function_declaration("function")
+        } else if self.match_token(vec![TokenType::Return]) {
+            self.return_statement()
         } else {
             self.expression_statement()
         }
@@ -464,5 +465,40 @@ impl Parser {
         }
         block.push(while_body);
         Ok(Stmt::Block(block))
+    }
+
+    fn function_declaration(&mut self, kind: &str) -> Result<Stmt, RloxError> {
+        let name = self.consume(TokenType::Identifier, &format!("Expect {} name", kind))?.clone();
+        self.consume(TokenType::LeftParen, &format!("Expect '(' after {} name", kind))?;
+        let mut params = vec![];
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if params.len() >= 255 {
+                    return Err(self.error("Can't have more than 255 parameters"));
+                }
+                params.push(self.consume(TokenType::Identifier, "Expect parameter name")?.clone());
+                if !self.match_token(vec![TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+        self.consume(TokenType::RightParen, "Expect ')' after parameters")?;
+        self.consume(TokenType::LeftBrace, &format!("Expect '{{' before {} body", kind))?;
+        let body_block = self.block()?;
+        let body = match body_block {
+            Stmt::Block(block) => block,
+            _ => panic!("should not happen"),
+        };
+        Ok(Stmt::FunctionDecl(name, params, Rc::new(body)))
+    }
+
+    fn return_statement(&mut self) -> Result<Stmt, RloxError> {
+        let value = if !self.check(TokenType::Semicolon) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.consume(TokenType::Semicolon, "Expect ';' after return value")?;
+        Ok(Stmt::Return(value))
     }
 }

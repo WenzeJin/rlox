@@ -1,4 +1,5 @@
 use crate::ast::*;
+use std::rc::Rc;
 
 pub struct AstPrinter();
 
@@ -59,11 +60,11 @@ impl expr::Visitor<String> for AstPrinter {
         return self.parenthesize(&operator.lexeme, vec![right]);
     }
 
-    fn visit_variable_expr(&mut self, name: &token::Token) -> String {
+    fn visit_variable_expr(&mut self, name: &Rc<token::Token>) -> String {
         return name.lexeme.clone();
     }
 
-    fn visit_assign_expr(&mut self, left: &token::Token, right: &expr::Expr) -> String {
+    fn visit_assign_expr(&mut self, left: &Rc<token::Token>, right: &expr::Expr) -> String {
         let mut result = String::new();
         result.push_str("(= ");
         result.push_str(&left.lexeme);
@@ -136,6 +137,32 @@ impl stmt::Visitor<String> for AstPrinter {
         result.push_str(&condition.accept(self));
         result.push_str(" ");
         result.push_str(&body.accept(self));
+        result.push_str(")");
+        result
+    }
+
+    fn visit_function_decl_stmt(&mut self, name: &token::Token, params: &Vec<token::Token>, body: &Rc<Vec<stmt::Stmt>>) -> String {
+        let mut result = String::new();
+        result.push_str("(function ");
+        result.push_str(&name.lexeme);
+        result.push_str(" (");
+        for param in params {
+            result.push_str(&param.lexeme);
+            result.push_str(" ");
+        }
+        result.push_str(") ");
+        result.push_str(&self.block(body));
+        result.push_str(")");
+        result
+    }
+
+    fn visit_return_stmt(&mut self, value: &Option<expr::Expr>) -> String {
+        let mut result = String::new();
+        result.push_str("(return");
+        if let Some(expr) = value {
+            result.push_str(" ");
+            result.push_str(&expr.accept(self));
+        }
         result.push_str(")");
         result
     }

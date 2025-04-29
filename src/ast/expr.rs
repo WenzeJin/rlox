@@ -1,5 +1,6 @@
 //! Describes the expression AST nodes.
 use crate::ast::token::Token;
+use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -8,10 +9,9 @@ pub enum Expr {
     Grouping(Box<Expr>),
     Literal(LiteralValue),
     Unary(Token, Box<Expr>),
-    Assign(Token, Box<Expr>),
-    Variable(Token),
+    Assign(Rc<Token>, Box<Expr>),
+    Variable(Rc<Token>),
     Call(Box<Expr>, Vec<Expr>, usize), // (callee, arguments, line)
-
 }
 
 #[derive(Debug, Clone)]
@@ -28,8 +28,8 @@ pub trait Visitor<T> {
     fn visit_grouping_expr(&mut self, expression: &Expr) -> T;
     fn visit_literal_expr(&mut self, value: &LiteralValue) -> T;
     fn visit_unary_expr(&mut self, operator: &Token, right: &Expr) -> T;
-    fn visit_variable_expr(&mut self, name: &Token) -> T;
-    fn visit_assign_expr(&mut self, left: &Token, right: &Expr) -> T;
+    fn visit_variable_expr(&mut self, name: &Rc<Token>) -> T;
+    fn visit_assign_expr(&mut self, left: &Rc<Token>, right: &Expr) -> T;
     fn visit_call_expr(&mut self, callee: &Expr, arguments: &[Expr]) -> T;
 }
 

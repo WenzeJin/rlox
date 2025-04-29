@@ -1,0 +1,14 @@
+fun higherOrder(func, value) {
+    return func(value);
+}
+
+fun square(x) {
+    return x * x;
+}
+
+fun increment(x) {
+    return x + 1;
+}
+
+print higherOrder(square, 3); // 9
+print higherOrder(increment, 7); // 8

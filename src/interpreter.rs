@@ -1,14 +1,17 @@
 
 use crate::ast::{expr, stmt};
-use crate::value::LoxValue;
+use crate::value::{LoxValue, LoxCallable};
 use crate::env::Environment;
 use crate::ast::token::{Token, TokenType};
 use crate::error::RloxError;
 use crate::builtin::register_builtins;
+use std::rc::Rc;
+use std::collections::HashMap;
 
 pub struct Interpreter {
     pub had_error: bool,
     pub env: Environment,
+    pub locals: HashMap<Rc<Token>, usize>,
 }
 
 impl Interpreter {
@@ -18,14 +21,16 @@ impl Interpreter {
         Interpreter {
             had_error: false,
             env: environment,
+            locals: HashMap::new(),
         }
     }
 
-    pub fn from_env(env: Environment) -> Interpreter {
-        Interpreter {
-            had_error: false,
-            env,
-        }
+    pub fn change_env(&mut self, env: Environment) -> Environment {
+        std::mem::replace(&mut self.env, env)
+    }
+
+    pub fn resolve(&mut self, name: &Rc<Token>, depth: usize) {
+        self.locals.insert(Rc::clone(name), depth);
     }
 
     /// If the program is a valid program, it will be interpreted. <br>
@@ -42,11 +47,19 @@ impl Interpreter {
             self.had_error = true;
         }
     }
+
+    /// This function is used to execute a block of statements. <br>
+    /// Different from the visit_block_stmt function, this function does not enter a new scope. <br>
+    /// So it is used to execute a block of statements in the current scope. <br>
+    pub fn execute_block(&mut self, block: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
+        for statement in block {
+            statement.accept(self)?;
+        }
+        Ok(())
+    }
 }
 
 impl Interpreter {
-
-
     fn is_truthy(value: &LoxValue) -> bool {
         match value {
             LoxValue::Boolean(b) => *b,
@@ -58,11 +71,11 @@ impl Interpreter {
 
 impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
 
-    fn visit_variable_expr(&mut self, name: &Token) -> Result<LoxValue, RloxError> {
-        self.env.get(&name)
+    fn visit_variable_expr(&mut self, name: &Rc<Token>) -> Result<LoxValue, RloxError> {
+        self.env.get(name)
     }
 
-    fn visit_assign_expr(&mut self, left: &Token, right: &expr::Expr) -> Result<LoxValue, RloxError> {
+    fn visit_assign_expr(&mut self, left: &Rc<Token>, right: &expr::Expr) -> Result<LoxValue, RloxError> {
         let value = right.accept(self)?;
         self.env.assign(left, value.clone())?;
         Ok(value)
@@ -212,13 +225,7 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
 
 impl Interpreter {
     fn runtime_error(&mut self, error: RloxError) {
-        match error {
-            RloxError::RuntimeError(message, lexeme) => {
-                eprintln!("RuntimeError: {}: {}", message, lexeme);
-                self.had_error = true;
-            }
-            _ => {}
-        }
+        eprintln!("{}", error);
     }
 }
 
@@ -246,7 +253,10 @@ impl stmt::Visitor<Result<(), RloxError>> for Interpreter {
     fn visit_block_stmt(&mut self, statements: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
         self.env.enter_scope();
         for statement in statements {
-            statement.accept(self)?;
+            if let Err(e) = statement.accept(self) {
+                self.env.exit_scope();
+                return Err(e);
+            }
         }
         self.env.exit_scope();
         Ok(())
@@ -276,5 +286,31 @@ impl stmt::Visitor<Result<(), RloxError>> for Interpreter {
             body.accept(self)?;
         }
         Ok(())
+    }
+
+    fn visit_function_decl_stmt(&mut self, name: &Token, params: &Vec<Token>, body: &Rc<Vec<stmt::Stmt>>) -> Result<(), RloxError> {
+        // resolve function name
+        let name = name.lexeme.clone();
+        // resolve names of parameters
+        let params: Vec<String> = params.iter().map(|param| param.lexeme.clone()).collect();
+        // create a new function
+        let function = LoxValue::Callable(LoxCallable::UserFunction {
+            def_name: name.clone(),
+            params,
+            body: Rc::clone(body),
+            closure: Rc::clone(&self.env.values),
+        });
+        // define the function in the current environment
+        self.env.define(&name, function);
+        Ok(())
+    }
+
+    fn visit_return_stmt(&mut self, value: &Option<expr::Expr>) -> Result<(), RloxError> {
+        let value = if let Some(expr) = value {
+            expr.accept(self)?
+        } else {
+            LoxValue::Null
+        };
+        Err(RloxError::ReturnValue(value))
     }
 }

@@ -2,6 +2,7 @@
 
 use crate::ast::expr::Expr;
 use crate::ast::token::Token;
+use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
@@ -10,8 +11,10 @@ pub enum Stmt {
     Program(Vec<Stmt>),
     Expression(Expr),
     Print(Expr),
+    Return(Option<Expr>),
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     While(Expr, Box<Stmt>),
+    FunctionDecl(Token, Vec<Token>, Rc<Vec<Stmt>>),   // Decl name, params, body. Body uses Rc, because function instance will link to it.
 }
 
 pub trait Visitor<T> {
@@ -22,6 +25,8 @@ pub trait Visitor<T> {
     fn visit_var_stmt(&mut self, name: &Token, initializer: &Option<Expr>) -> T;
     fn visit_if_stmt(&mut self, condition: &Expr, then_branch: &Box<Stmt>, else_branch: &Option<Box<Stmt>>) -> T;
     fn visit_while_stmt(&mut self, condition: &Expr, body: &Box<Stmt>) -> T;
+    fn visit_function_decl_stmt(&mut self, name: &Token, params: &Vec<Token>, body: &Rc<Vec<Stmt>>) -> T;
+    fn visit_return_stmt(&mut self, value: &Option<Expr>) -> T;
 }
 
 impl Stmt {
@@ -43,6 +48,10 @@ impl Stmt {
                 => visitor.visit_if_stmt(condition, then_branch, else_branch),
             Stmt::While(condition, body)
                 => visitor.visit_while_stmt(condition, body),
+            Stmt::FunctionDecl(name, params, body)
+                => visitor.visit_function_decl_stmt(name, params, body),
+            Stmt::Return(value)
+                => visitor.visit_return_stmt(value),
         }
     }
 }

@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TokenType {
     // Single-character tokens
     LeftParen, RightParen, LeftBrace, RightBrace,
@@ -20,30 +20,18 @@ pub enum TokenType {
     EOF
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Token {
     pub t_type: TokenType,
     pub lexeme: String,
-    pub literal: Option<Literal>,
     pub line: usize,
 }
 
-
-
-#[derive(Debug, Clone)]
-pub enum Literal {
-    Bool(bool),
-    Number(f64),
-    String(String),
-    Nil,
-}
-
 impl Token {
-    pub fn new(t_type: TokenType, lexeme: String, literal: Option<Literal>, line: usize) -> Token {
+    pub fn new(t_type: TokenType, lexeme: String, line: usize) -> Token {
         Token {
             t_type,
             lexeme,
-            literal,
             line,
         }
     }

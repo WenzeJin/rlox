@@ -22,7 +22,7 @@ pub enum LoxCallable {
     UserFunction {
         def_name: String,
         params: Vec<String>,
-        body: Rc<Stmt>,
+        body: Rc<Vec<Stmt>>,
         closure: Rc<RefCell<EnvItem>>,  // Environment of this function
     },
 }
@@ -34,7 +34,16 @@ impl ToString for LoxValue {
             LoxValue::String(s) => s.clone(),
             LoxValue::Boolean(b) => b.to_string(),
             LoxValue::Null => "nil".to_string(),
-            LoxValue::Callable(_) => "function".to_string(),
+            LoxValue::Callable(f) => f.to_string(),
+        }
+    }
+}
+
+impl ToString for LoxCallable {
+    fn to_string(&self) -> String {
+        match self {
+            LoxCallable::BuiltInFunction(_, _) => "<native fn>".to_string(),
+            LoxCallable::UserFunction { def_name, .. } => "<fn {}>".replace("{}", def_name),
         }
     }
 }
@@ -52,12 +61,12 @@ impl LoxCallable {
             panic!("Arity should be checked before invoking");
         }
         match self {
-            LoxCallable::UserFunction { def_name, params, body, closure } => {
+            LoxCallable::UserFunction { def_name , params, body, closure } => {
                 // create a new environment for the function call
                 let global = interpreter.env.global.clone();
                 let closure = closure.clone();
                 let env = Environment::from(global, closure);
-                let mut interpreter = Interpreter::from_env(env);
+                let old_env = interpreter.change_env(env);
                 // enter a new scope
                 interpreter.env.enter_scope();
                 // bind parameters to arguments
@@ -65,9 +74,10 @@ impl LoxCallable {
                     interpreter.env.define(param, arg.clone());
                 }
                 // evaluate the function body
-                let result = body.accept(&mut interpreter);
+                let result = interpreter.execute_block(body);
                 // exit the scope
                 interpreter.env.exit_scope();
+                interpreter.change_env(old_env);
                 // return the result
                 // if the result is a return statement, return the value
                 match result {
