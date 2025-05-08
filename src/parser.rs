@@ -272,7 +272,7 @@ impl Parser {
             },
             TokenType::Identifier => {
                 let name = self.advance().clone();
-                Ok(Expr::Variable(Rc::new(name)))
+                Ok(Expr::Variable(name))
             },
             TokenType::Number => {
                 let lexeme = self.peek().lexeme.clone();

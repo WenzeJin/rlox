@@ -6,16 +6,17 @@ use crate::error::RloxError;
 use crate::interpreter::Interpreter;
 use crate::ast::*;
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 enum FunctionType {
     None,
     Function,
 }
 
 pub struct Resolver<'a> {
-    interpreter: &'a mut Interpreter,
+    pub interpreter: &'a mut Interpreter,
     scope: Vec<HashMap<String, bool>>,
     current_function: FunctionType,
-    had_error: bool,
+    pub had_error: bool,
 }
 
 impl<'a> Resolver<'a> {
@@ -32,40 +33,37 @@ impl<'a> Resolver<'a> {
 impl<'a> Resolver<'a> {
     fn error(&mut self, err: RloxError) {
         // Handle the error (e.g., log it, print it, etc.)
-        eprintln!("{}", err);
+        println!("{}", err);
         self.had_error = true;
     }
 
-    fn resolve_stmt(&mut self, stmt: &stmt::Stmt) {
-        if let Err(err) = stmt.accept(self) {
+    pub fn resolve_program(&mut self, program: &stmt::Stmt) {
+        if let Err(err) = program.accept(self) {
             self.had_error = true;
             self.error(err);
         }
     }
 
-    fn resolve_stmts(&mut self, stmts: &[stmt::Stmt]) {
+    fn resolve_stmt(&mut self, stmt: &stmt::Stmt) -> Result<(), RloxError> {
+        stmt.accept(self)
+    }
+
+    fn resolve_stmts(&mut self, stmts: &[stmt::Stmt]) -> Result<(), RloxError>{
         for stmt in stmts {
-            self.resolve_stmt(stmt);
-            if self.had_error {
-                break;
-            }
+            self.resolve_stmt(stmt)?;
         }
+        Ok(())
     }
 
-    fn resolve_expr(&mut self, expr: &expr::Expr) {
-        if let Err(err) = expr.accept(self) {
-            self.had_error = true;
-            self.error(err);
-        }
+    fn resolve_expr(&mut self, expr: &expr::Expr) -> Result<(), RloxError>{
+        expr.accept(self)
     }
 
-    fn resolve_exprs(&mut self, exprs: &[expr::Expr]) {
+    fn resolve_exprs(&mut self, exprs: &[expr::Expr]) -> Result<(), RloxError>{
         for expr in exprs {
-            self.resolve_expr(expr);
-            if self.had_error {
-                break;
-            }
+            self.resolve_expr(expr)?;
         }
+        Ok(())
     }
 
     fn begin_scope(&mut self) {
@@ -103,8 +101,8 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn resolve_local(&mut self, name: &Rc<token::Token>) -> Result<(), RloxError> {
-        for (i, scope) in self.scope.iter().enumerate().rev() {
+    fn resolve_local(&mut self, name: &token::Token) -> Result<(), RloxError> {
+        for (i, scope) in self.scope.iter().rev().enumerate() {
             if scope.contains_key(&name.lexeme) {
                 // Variable is defined in this scope
                 self.interpreter.resolve(name, i);
@@ -117,27 +115,100 @@ impl<'a> Resolver<'a> {
             String::new()
         ))
     }
+
+    fn resolve_function(&mut self, params: &Vec<token::Token>, body: &Rc<Vec<stmt::Stmt>>) -> Result<(), RloxError> {
+        self.begin_scope();
+        self.current_function = FunctionType::Function;
+        for param in params {
+            self.declare(param)?;
+            self.define(param);
+        }
+        self.resolve_stmts(body)?;
+        self.end_scope();
+        self.current_function = FunctionType::None;
+        Ok(())
+    }
 }
 
 impl<'a> stmt::Visitor<Result<(), RloxError>> for Resolver<'a> {
     fn visit_block_stmt(&mut self, declarations: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
         self.begin_scope();
-        self.resolve_stmts(declarations);
+        self.resolve_stmts(declarations)?;
         self.end_scope();
         Ok(())
     }
 
+    fn visit_var_stmt(&mut self, name: &token::Token, initializer: &Option<expr::Expr>) -> Result<(), RloxError> {
+        self.declare(name)?;
+        if let Some(initializer) = initializer {
+            self.resolve_expr(initializer)?;
+        }
+        self.define(name);
+        Ok(())
+    }
 
+    fn visit_function_decl_stmt(&mut self, name: &token::Token, params: &Vec<token::Token>, body: &Rc<Vec<stmt::Stmt>>) -> Result<(), RloxError> {
+        self.declare(name)?;
+        self.define(name);
+        self.resolve_function(params, body)?;
+        Ok(())
+    }
+
+    fn visit_expression_stmt(&mut self, expression: &expr::Expr) -> Result<(), RloxError> {
+        self.resolve_expr(expression)?;
+        Ok(())
+    }
+
+    fn visit_if_stmt(&mut self, condition: &expr::Expr, then_branch: &Box<stmt::Stmt>, else_branch: &Option<Box<stmt::Stmt>>) -> Result<(), RloxError> {
+        self.resolve_expr(condition)?;
+        self.resolve_stmt(then_branch)?;
+        if let Some(else_branch) = else_branch {
+            self.resolve_stmt(else_branch)?;
+        }
+        Ok(())
+    }
+
+    fn visit_while_stmt(&mut self, condition: &expr::Expr, body: &Box<stmt::Stmt>) -> Result<(), RloxError> {
+        self.resolve_expr(condition)?;
+        self.resolve_stmt(body)?;
+        Ok(())
+    }
+
+    fn visit_print_stmt(&mut self, expression: &expr::Expr) -> Result<(), RloxError> {
+        self.resolve_expr(expression)?;
+        Ok(())
+    }
+
+    fn visit_return_stmt(&mut self, value: &Option<expr::Expr>) -> Result<(), RloxError> {
+        if self.current_function == FunctionType::None {
+            return Err(RloxError::RuntimeError(
+                format!("Can't return from non-function."),
+                String::new()
+            ));
+        }
+        if let Some(value) = value {
+            self.resolve_expr(value)?;
+        }
+        Ok(())
+    }
+
+    fn visit_program_stmt(&mut self, declarations: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
+        self.begin_scope();
+        self.current_function = FunctionType::None;
+        self.resolve_stmts(declarations)?;
+        self.end_scope();
+        Ok(())
+    }
 }
 
 impl<'a> expr::Visitor<Result<(), RloxError>> for Resolver<'a> {
-    fn visit_variable_expr(&mut self, name: &Rc<token::Token>) -> Result<(), RloxError> {
+    fn visit_variable_expr(&mut self, name: &token::Token) -> Result<(), RloxError> {
         if !self.scope.is_empty() {
             if let Some(scope) = self.scope.last() {
                 if let Some(defined) = scope.get(&name.lexeme) {
                     if !defined {
                         return Err(RloxError::RuntimeError(
-                            format!("Variable used before declaration: {}", name.lexeme),
+                            format!("Can't read local variable in its own initializer."),
                             String::new()
                         ));
                     }
@@ -148,12 +219,44 @@ impl<'a> expr::Visitor<Result<(), RloxError>> for Resolver<'a> {
         Ok(())
     }
 
-    fn visit_assign_expr(&mut self, left: &Rc<token::Token>, right: &expr::Expr) -> Result<(), RloxError> {
+    fn visit_assign_expr(&mut self, left: &token::Token, right: &expr::Expr) -> Result<(), RloxError> {
         right.accept(self)?;
         self.resolve_local(left)?;
         Ok(())
     }
 
-    
+    fn visit_binary_expr(&mut self, left: &expr::Expr, _operator: &token::Token, right: &expr::Expr) -> Result<(), RloxError> {
+        left.accept(self)?;
+        right.accept(self)?;
+        Ok(())
+    }
+
+    fn visit_grouping_expr(&mut self, expression: &expr::Expr) -> Result<(), RloxError> {
+        expression.accept(self)?;
+        Ok(())
+    }
+
+    fn visit_call_expr(&mut self, callee: &expr::Expr, arguments: &[expr::Expr]) -> Result<(), RloxError> {
+        callee.accept(self)?;
+        for argument in arguments {
+            argument.accept(self)?;
+        }
+        Ok(())
+    }
+
+    fn visit_literal_expr(&mut self, _: &expr::LiteralValue) -> Result<(), RloxError> {
+        Ok(())
+    }
+
+    fn visit_logical_expr(&mut self, left: &expr::Expr, _: &token::Token, right: &expr::Expr) -> Result<(), RloxError> {
+        left.accept(self)?;
+        right.accept(self)?;
+        Ok(())
+    }
+
+    fn visit_unary_expr(&mut self, _operator: &token::Token, right: &expr::Expr) -> Result<(), RloxError> {
+        right.accept(self)?;
+        Ok(())
+    }
 
 }

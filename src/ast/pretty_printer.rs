@@ -60,11 +60,11 @@ impl expr::Visitor<String> for AstPrinter {
         return self.parenthesize(&operator.lexeme, vec![right]);
     }
 
-    fn visit_variable_expr(&mut self, name: &Rc<token::Token>) -> String {
+    fn visit_variable_expr(&mut self, name: &token::Token) -> String {
         return name.lexeme.clone();
     }
 
-    fn visit_assign_expr(&mut self, left: &Rc<token::Token>, right: &expr::Expr) -> String {
+    fn visit_assign_expr(&mut self, left: &token::Token, right: &expr::Expr) -> String {
         let mut result = String::new();
         result.push_str("(= ");
         result.push_str(&left.lexeme);

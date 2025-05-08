@@ -3,7 +3,9 @@ use std::io::{self, Read, Write};
 use crate::error::RloxError;
 use crate::scanner::Scanner;
 use crate::interpreter::Interpreter;
+use crate::resolver::Resolver;
 use crate::parser::Parser;
+use crate::ast::pretty_printer::AstPrinter;
 
 pub fn run_file(filename: &str) -> Result<(), RloxError> {
     let mut file = File::open(filename)?;
@@ -18,6 +20,7 @@ pub fn run_prompt() -> Result<(), RloxError> {
     let mut stdout = io::stdout();
     let mut buffer = String::new();
     let mut interpreter = Interpreter::new();
+    let mut resolver = Resolver::new(&mut interpreter);
 
     loop {
         print!("> ");
@@ -27,7 +30,7 @@ pub fn run_prompt() -> Result<(), RloxError> {
         if buffer.trim().is_empty() {
             continue;
         }
-        run_tree_walk_continuous(buffer.clone(), &mut interpreter);
+        run_tree_walk_continuous(buffer.clone(), &mut resolver);
     }
 }
 
@@ -44,6 +47,12 @@ fn run_tree_walk(source: String) {
                 return;
             }
             let mut interpreter = Interpreter::new();
+            let mut resolver = Resolver::new(&mut interpreter);
+            resolver.resolve_program(&program);
+            if resolver.had_error {
+                eprintln!("Error occurred during resolution.");
+                return;
+            }
             interpreter.interpret(program);
         }
         None => {
@@ -52,7 +61,7 @@ fn run_tree_walk(source: String) {
     }
 }
 
-fn run_tree_walk_continuous(source: String, interpreter: &mut Interpreter) {
+fn run_tree_walk_continuous(source: String, resolver: &mut Resolver) {
     let mut scanner = Scanner::new(source);
     let tokens = scanner.scan_tokens();
     if scanner.had_error {
@@ -64,7 +73,8 @@ fn run_tree_walk_continuous(source: String, interpreter: &mut Interpreter) {
             if parser.had_error {
                 return;
             }
-            interpreter.interpret(program);
+            resolver.resolve_program(&program);
+            resolver.interpreter.interpret(program);
         }
         None => {
             eprintln!("No parse result found. Error occurred during parsing.");

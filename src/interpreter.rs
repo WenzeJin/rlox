@@ -11,7 +11,7 @@ use std::collections::HashMap;
 pub struct Interpreter {
     pub had_error: bool,
     pub env: Environment,
-    pub locals: HashMap<Rc<Token>, usize>,
+    pub locals: HashMap<Token, usize>,
 }
 
 impl Interpreter {
@@ -29,8 +29,8 @@ impl Interpreter {
         std::mem::replace(&mut self.env, env)
     }
 
-    pub fn resolve(&mut self, name: &Rc<Token>, depth: usize) {
-        self.locals.insert(Rc::clone(name), depth);
+    pub fn resolve(&mut self, name: &Token, depth: usize) {
+        self.locals.insert(name.clone(), depth);
     }
 
     /// If the program is a valid program, it will be interpreted. <br>
@@ -71,14 +71,23 @@ impl Interpreter {
 
 impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
 
-    fn visit_variable_expr(&mut self, name: &Rc<Token>) -> Result<LoxValue, RloxError> {
-        self.env.get(name)
+    fn visit_variable_expr(&mut self, name: &Token) -> Result<LoxValue, RloxError> {
+        if let Some(depth) = self.locals.get(name) {
+            self.env.get_by_depth(name, *depth)
+        } else {
+            self.env.get(name)
+        }
     }
 
-    fn visit_assign_expr(&mut self, left: &Rc<Token>, right: &expr::Expr) -> Result<LoxValue, RloxError> {
+    fn visit_assign_expr(&mut self, left: &Token, right: &expr::Expr) -> Result<LoxValue, RloxError> {
         let value = right.accept(self)?;
-        self.env.assign(left, value.clone())?;
-        Ok(value)
+        if let Some(depth) = self.locals.get(left) {
+            self.env.assign_by_depth(left, value.clone(), *depth)?;
+            return Ok(value);
+        } else {
+            self.env.assign(left, value.clone())?;
+            Ok(value)
+        }
     }
 
     fn visit_literal_expr(&mut self, value: &expr::LiteralValue) -> Result<LoxValue, RloxError> {

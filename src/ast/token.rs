@@ -25,7 +25,10 @@ pub struct Token {
     pub t_type: TokenType,
     pub lexeme: String,
     pub line: usize,
+    pub id: usize,
 }
+
+static mut ID_COUNTER: usize = 0;
 
 impl Token {
     pub fn new(t_type: TokenType, lexeme: String, line: usize) -> Token {
@@ -33,6 +36,10 @@ impl Token {
             t_type,
             lexeme,
             line,
+            id: unsafe {
+                ID_COUNTER += 1;
+                ID_COUNTER
+            },
         }
     }
 }

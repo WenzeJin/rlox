@@ -88,6 +88,19 @@ impl Environment {
         Err(RloxError::RuntimeError("Undefined variable".to_string(), name.clone()))
     }
 
+    pub fn assign_by_depth(&mut self, name: &Token, value: LoxValue, depth: usize) -> Result<(), RloxError> {
+        if name.t_type != TokenType::Identifier {
+            return Err(RloxError::RuntimeError("Invalid token type".to_string(), name.lexeme.clone()));
+        }
+        let name = &name.lexeme;
+        let current = self.ancestor(depth);
+        if let Some(v) = current.borrow_mut().table.get_mut(name) {
+            *v = value;
+            return Ok(());
+        }
+        Err(RloxError::RuntimeError("Undefined variable".to_string(), name.clone()))
+    }
+
     pub fn define_globally(&mut self, name: &str, value: LoxValue) {
         self.global.borrow_mut().table.insert(name.to_string(), value);
     }
@@ -115,6 +128,35 @@ impl Environment {
             Some(value) => Ok(value),
             None => Err(RloxError::RuntimeError("Undefined variable".to_string(), name.lexeme.clone())),
         }
+    }
+
+    pub fn get_by_depth(&self, name: &Token, depth: usize) -> Result<LoxValue, RloxError> {
+        if name.t_type != TokenType::Identifier {
+            return Err(RloxError::RuntimeError("Invalid token type".to_string(), name.lexeme.clone()));
+        }
+        // go to depth
+        let current = self.ancestor(depth);
+        let res = match current.borrow().table.get(&name.lexeme) {
+            Some(value) => Ok(value.clone()),
+            None => Err(RloxError::RuntimeError("Undefined variable".to_string(), name.lexeme.clone())),
+        };
+        return res;
+    }
+
+    fn ancestor(&self, depth: usize) -> Rc<RefCell<EnvItem>> {
+        let mut current = Rc::clone(&self.values);
+        for _ in 0..depth {
+            let parent = {
+                let current_borrow = current.borrow();
+                current_borrow.parent.as_ref().map(Rc::clone)
+            };
+            if let Some(parent) = parent {
+                current = parent;
+            } else {
+                panic!("No parent scope to exit to");
+            }
+        }
+        current
     }
     
     
