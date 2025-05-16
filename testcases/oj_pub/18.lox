@@ -1,0 +1,4 @@
+fun square(x) {
+  return x * x;
+}
+print square(square(2));

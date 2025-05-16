@@ -3,21 +3,38 @@
 use crate::error::RloxError;
 use crate::interpreter::Interpreter;
 use crate::ast::stmt::Stmt;
+use crate::class::{LoxClass, LoxInstance};
 use std::cell::RefCell;
 use std::rc::Rc;
 use crate::env::{EnvItem, Environment};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum LoxValue {
     Number(f64),
+    Class(Rc<RefCell<LoxClass>>),
     String(String),
     Boolean(bool),
-    Callable(LoxCallable),
+    Callable(LoxFunction),
+    Instance(Rc<RefCell<LoxInstance>>),
     Null,
 }
 
+impl PartialEq for LoxValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (LoxValue::Number(a), LoxValue::Number(b)) => a == b,
+            (LoxValue::String(a), LoxValue::String(b)) => a == b,
+            (LoxValue::Boolean(a), LoxValue::Boolean(b)) => a == b,
+            (LoxValue::Null, LoxValue::Null) => true,
+            (LoxValue::Instance(a), LoxValue::Instance(b)) => Rc::ptr_eq(&a, &b),
+            _ => false,
+        }
+    }
+}
+
+
 #[derive(Debug, Clone)]
-pub enum LoxCallable {
+pub enum LoxFunction {
     BuiltInFunction(u32, fn(Vec<LoxValue>) -> Result<LoxValue, RloxError>),     // (Arity, Function)
     UserFunction {
         def_name: String,
@@ -27,6 +44,8 @@ pub enum LoxCallable {
     },
 }
 
+
+
 impl ToString for LoxValue {
     fn to_string(&self) -> String {
         match self {
@@ -35,24 +54,28 @@ impl ToString for LoxValue {
             LoxValue::Boolean(b) => b.to_string(),
             LoxValue::Null => "nil".to_string(),
             LoxValue::Callable(f) => f.to_string(),
+            LoxValue::Instance(i) => i.borrow().to_string(),
+            LoxValue::Class(c) => c.borrow().to_string(),
         }
     }
 }
 
-impl ToString for LoxCallable {
+
+
+impl ToString for LoxFunction {
     fn to_string(&self) -> String {
         match self {
-            LoxCallable::BuiltInFunction(_, _) => "<native fn>".to_string(),
-            LoxCallable::UserFunction { def_name, .. } => "<fn {}>".replace("{}", def_name),
+            LoxFunction::BuiltInFunction(_, _) => "<native fn>".to_string(),
+            LoxFunction::UserFunction{def_name, ..} => format!("<fn {}>", def_name),
         }
     }
 }
 
-impl LoxCallable {
+impl LoxFunction {
     pub fn arity (&self) -> u32 {
         match self {
-            LoxCallable::UserFunction { params, .. } => params.len() as u32,
-            LoxCallable::BuiltInFunction(arity, _) => *arity,
+            LoxFunction::UserFunction{params, .. } => params.len() as u32,
+            LoxFunction::BuiltInFunction(arity, _) => *arity,
         }
     }
 
@@ -61,7 +84,7 @@ impl LoxCallable {
             panic!("Arity should be checked before invoking");
         }
         match self {
-            LoxCallable::UserFunction { def_name , params, body, closure } => {
+            LoxFunction::UserFunction{ params, body, closure, .. } => {
                 // create a new environment for the function call
                 let global = interpreter.env.global.clone();
                 let closure = closure.clone();
@@ -94,16 +117,34 @@ impl LoxCallable {
                     }
                 }
             },
-            LoxCallable::BuiltInFunction(_, implementation) => {
+            LoxFunction::BuiltInFunction(_, implementation) => {
                 // invoke built-in function
                 implementation(arguments)
             },
         }
     }
+
+    pub fn bind(&self, instance: Rc<RefCell<LoxInstance>>) -> LoxFunction {
+        match self {
+            LoxFunction::UserFunction { def_name, params, body, closure } => {
+                // eprintln!("old closure: {:?}", closure);
+                let mut new_closure = EnvItem::from_parent(Rc::clone(&closure));
+                new_closure.table.insert("this".to_string(), LoxValue::Instance(instance));
+                LoxFunction::UserFunction {
+                    def_name: def_name.clone(),
+                    params: params.clone(),
+                    body: Rc::clone(body),
+                    closure: Rc::new(RefCell::new(new_closure)),
+                }
+            }
+            _ => panic!("Cannot bind a built-in function"),
+        }
+    }
 }
 
-impl PartialEq for LoxCallable {
+impl PartialEq for LoxFunction {
     fn eq(&self, other: &Self) -> bool {
         std::ptr::eq(self, other)
     }
 }
+

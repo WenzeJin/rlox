@@ -8,3 +8,4 @@ pub mod interpreter;
 pub mod env;
 pub mod builtin;
 pub mod resolver;
+pub mod class;

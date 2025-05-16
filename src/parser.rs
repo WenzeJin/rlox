@@ -130,10 +130,16 @@ impl Parser {
 
         if self.match_token(vec![TokenType::Equal]) {
             let value = self.assignment()?;
-            if let Expr::Variable(name) = expr {
-                return Ok(Expr::Assign(name, Box::new(value)));
-            } else {
-                return Err(self.error("Invalid assignment target, requires variable"));
+            match expr {
+                Expr::Variable(name) => {
+                    return Ok(Expr::Assign(name, Box::new(value)));
+                }
+                Expr::Get(object, name) => {
+                    return Ok(Expr::Set(object, name, Box::new(value)));
+                }
+                _ => {
+                    return Err(self.error("Invalid assignment target, requires variable"));
+                }
             }
         }
 
@@ -229,7 +235,11 @@ impl Parser {
         loop {
             if self.match_token(vec![TokenType::LeftParen]) {
                 expr = self.finish_call(expr)?;
+            } else if self.match_token(vec![TokenType::Dot]) {
+                let name = self.consume(TokenType::Identifier, "Expect property name after '.'")?.clone();
+                expr = Expr::Get(Box::new(expr), name);
             } else {
+                // TODO: if we need list, we can add it here
                 break;
             }
         }
@@ -307,6 +317,9 @@ impl Parser {
                 self.advance();
                 Ok(Expr::Grouping(Box::new(expr)))
             },
+            TokenType::This => {
+                Ok(Expr::This(self.advance().clone()))
+            }
             _ => Err(self.error("Expected expression")),
         }
     }
@@ -344,6 +357,10 @@ impl Parser {
     fn declaration(&mut self) -> Option<Stmt> {
         match if self.match_token(vec![TokenType::Var]) {
             self.var_declaration()
+        } else if self.match_token(vec![TokenType::Fun]) {
+            self.function_declaration("function")
+        } else if self.match_token(vec![TokenType::Class]) {
+            self.class_declaration()
         } else {
             self.statement()
         } {
@@ -377,8 +394,6 @@ impl Parser {
             self.while_statement()
         } else if self.match_token(vec![TokenType::For]) {
             self.for_statement()
-        } else if self.match_token(vec![TokenType::Fun]) {
-            self.function_declaration("function")
         } else if self.match_token(vec![TokenType::Return]) {
             self.return_statement()
         } else {
@@ -500,5 +515,21 @@ impl Parser {
         };
         self.consume(TokenType::Semicolon, "Expect ';' after return value")?;
         Ok(Stmt::Return(value))
+    }
+
+    fn class_declaration(&mut self) -> Result<Stmt, RloxError> {
+        let name = self.consume(TokenType::Identifier, "Expect class name")?.clone();
+        self.consume(TokenType::LeftBrace, "Expect '{' after class name")?;
+
+        let mut methods = vec![];
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            if let Ok(method) = self.function_declaration("method") {
+                methods.push(method);
+            }
+        };
+
+        self.consume(TokenType::RightBrace, "Expect '}' after class body")?;
+
+        Ok(Stmt::ClassDecl(name, methods))
     }
 }

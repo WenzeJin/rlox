@@ -11,8 +11,17 @@ use crate::ast::token::TokenType;
 
 #[derive(Debug)]
 pub struct EnvItem {
-    table: HashMap<String, LoxValue>,
-    parent: Option<Rc<RefCell<EnvItem>>>,
+    pub table: HashMap<String, LoxValue>,
+    pub parent: Option<Rc<RefCell<EnvItem>>>,
+}
+
+impl EnvItem {
+    pub fn from_parent(parent: Rc<RefCell<EnvItem>>) -> Self {
+        EnvItem {
+            table: HashMap::new(),
+            parent: Some(parent),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -58,6 +67,9 @@ impl Environment {
     pub fn exit_scope(&mut self) {
         let parent = self.values.borrow_mut().parent.take();
         if let Some(parent) = parent {
+            // NOTE: we must clear the current table to avoid memory leaks
+            // 如果在这里不清空当前的 table，table 中的 function closure 可能会引用这个 EnvItem，循环引用导致内存泄漏
+            self.values.borrow_mut().table.clear();
             self.values = parent;
         } else {
             panic!("No parent scope to exit to");
@@ -121,7 +133,7 @@ impl Environment {
     }
 
     pub fn get(&self, name: &Token) -> Result<LoxValue, RloxError> {
-        if name.t_type != TokenType::Identifier {
+        if name.t_type != TokenType::Identifier && name.t_type != TokenType::This {
             return Err(RloxError::RuntimeError("Invalid token type".to_string(), name.lexeme.clone()));
         }
         match Self::get_helper(&self.values, &name.lexeme) {
@@ -131,9 +143,10 @@ impl Environment {
     }
 
     pub fn get_by_depth(&self, name: &Token, depth: usize) -> Result<LoxValue, RloxError> {
-        if name.t_type != TokenType::Identifier {
+        if name.t_type != TokenType::Identifier && name.t_type != TokenType::This {
             return Err(RloxError::RuntimeError("Invalid token type".to_string(), name.lexeme.clone()));
         }
+        // eprintln!("get_by_depth: {:?}, env: {:?}", name, self.values);
         // go to depth
         let current = self.ancestor(depth);
         let res = match current.borrow().table.get(&name.lexeme) {

@@ -5,7 +5,6 @@ use crate::scanner::Scanner;
 use crate::interpreter::Interpreter;
 use crate::resolver::Resolver;
 use crate::parser::Parser;
-use crate::ast::pretty_printer::AstPrinter;
 
 pub fn run_file(filename: &str) -> Result<(), RloxError> {
     let mut file = File::open(filename)?;

@@ -85,7 +85,32 @@ impl expr::Visitor<String> for AstPrinter {
         result.push_str(")");
         result
     }
+
+    fn visit_get_expr(&mut self, object: &expr::Expr, name: &token::Token) -> String {
+        let mut result = String::new();
+        result.push_str("(get ");
+        result.push_str(&object.accept(self));
+        result.push_str(" ");
+        result.push_str(&name.lexeme);
+        result.push_str(")");
+        result
+    }
+
+    fn visit_set_expr(&mut self, object: &expr::Expr, name: &token::Token, value: &expr::Expr) -> String {
+        let mut result = String::new();
+        result.push_str("(set ");
+        result.push_str(&object.accept(self));
+        result.push_str(" ");
+        result.push_str(&name.lexeme);
+        result.push_str(" ");
+        result.push_str(&value.accept(self));
+        result.push_str(")");
+        result
+    }
     
+    fn visit_this_expr(&mut self, name: &token::Token) -> String {
+        return name.lexeme.clone();
+    }
 }
 
 impl stmt::Visitor<String> for AstPrinter {
@@ -166,5 +191,18 @@ impl stmt::Visitor<String> for AstPrinter {
         result.push_str(")");
         result
     }
+
+    fn visit_class_decl_stmt(&mut self, name: &token::Token, methods: &Vec<stmt::Stmt>) -> String {
+        let mut result = String::new();
+        result.push_str("(class ");
+        result.push_str(&name.lexeme);
+        for method in methods {
+            result.push_str(" ");
+            result.push_str(&method.accept(self));
+        }
+        result.push_str(")");
+        result
+    }
+
 }
 

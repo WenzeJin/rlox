@@ -1,10 +1,12 @@
 
 use crate::ast::{expr, stmt};
-use crate::value::{LoxValue, LoxCallable};
+use crate::value::{LoxFunction, LoxValue};
+use crate::class::{LoxClass, LoxInstance};
 use crate::env::Environment;
 use crate::ast::token::{Token, TokenType};
 use crate::error::RloxError;
 use crate::builtin::register_builtins;
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::collections::HashMap;
 
@@ -29,6 +31,17 @@ impl Interpreter {
         std::mem::replace(&mut self.env, env)
     }
 
+    
+    /// Resolves a variable by associating it with a specific depth in the environment.
+    ///
+    /// This function is used during the static analysis phase to record the depth
+    /// at which a variable is located in the environment. The depth is stored in
+    /// the `locals` map, which is later used during runtime to efficiently retrieve
+    /// the variable's value.
+    ///
+    /// # Parameters
+    /// - `name`: The `Token` representing the variable's name.
+    /// - `depth`: The depth of the variable in the environment hierarchy.
     pub fn resolve(&mut self, name: &Token, depth: usize) {
         self.locals.insert(name.clone(), depth);
     }
@@ -67,60 +80,15 @@ impl Interpreter {
             _ => true,
         }
     }
+
+    fn runtime_error(&mut self, error: RloxError) {
+        eprintln!("{}", error);
+    }
 }
 
+// MARK: Expression Visitor
+
 impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
-
-    fn visit_variable_expr(&mut self, name: &Token) -> Result<LoxValue, RloxError> {
-        if let Some(depth) = self.locals.get(name) {
-            self.env.get_by_depth(name, *depth)
-        } else {
-            self.env.get(name)
-        }
-    }
-
-    fn visit_assign_expr(&mut self, left: &Token, right: &expr::Expr) -> Result<LoxValue, RloxError> {
-        let value = right.accept(self)?;
-        if let Some(depth) = self.locals.get(left) {
-            self.env.assign_by_depth(left, value.clone(), *depth)?;
-            return Ok(value);
-        } else {
-            self.env.assign(left, value.clone())?;
-            Ok(value)
-        }
-    }
-
-    fn visit_literal_expr(&mut self, value: &expr::LiteralValue) -> Result<LoxValue, RloxError> {
-        match value {
-            expr::LiteralValue::Number(n) => Ok(LoxValue::Number(*n)),
-            expr::LiteralValue::String(s) => Ok(LoxValue::String(s.clone())),
-            expr::LiteralValue::Boolean(b) => Ok(LoxValue::Boolean(*b)),
-            expr::LiteralValue::Nil => Ok(LoxValue::Null),
-        }
-    }
-
-    fn visit_grouping_expr(&mut self, expression: &expr::Expr) -> Result<LoxValue, RloxError> {
-        expression.accept(self)
-    }
-
-    fn visit_unary_expr(&mut self, operator: &Token, right: &expr::Expr) -> Result<LoxValue, RloxError> {
-        let rv = right.accept(self)?;
-        match operator.t_type {
-            TokenType::Minus => {
-                if let LoxValue::Number(n) = rv {
-                    Ok(LoxValue::Number(-n))
-                } else {
-                    Err(RloxError::RuntimeError("Operand must be a number".to_string(), operator.lexeme.clone()))
-                }
-            }
-            TokenType::Bang => {
-                Ok(LoxValue::Boolean(!Interpreter::is_truthy(&rv)))
-            }
-            _ => Err(RloxError::RuntimeError("Unknown unary operator".to_string(), operator.lexeme.clone())),
-        }
-        
-    }
-
     fn visit_binary_expr(&mut self, left: &expr::Expr, operator: &Token, right: &expr::Expr) -> Result<LoxValue, RloxError> {
         let lv = left.accept(self)?;
         let rv = right.accept(self)?;
@@ -215,6 +183,56 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
         }
     }
 
+    fn visit_grouping_expr(&mut self, expression: &expr::Expr) -> Result<LoxValue, RloxError> {
+        expression.accept(self)
+    }
+
+    fn visit_literal_expr(&mut self, value: &expr::LiteralValue) -> Result<LoxValue, RloxError> {
+        match value {
+            expr::LiteralValue::Number(n) => Ok(LoxValue::Number(*n)),
+            expr::LiteralValue::String(s) => Ok(LoxValue::String(s.clone())),
+            expr::LiteralValue::Boolean(b) => Ok(LoxValue::Boolean(*b)),
+            expr::LiteralValue::Nil => Ok(LoxValue::Null),
+        }
+    }
+
+    fn visit_unary_expr(&mut self, operator: &Token, right: &expr::Expr) -> Result<LoxValue, RloxError> {
+        let rv = right.accept(self)?;
+        match operator.t_type {
+            TokenType::Minus => {
+                if let LoxValue::Number(n) = rv {
+                    Ok(LoxValue::Number(-n))
+                } else {
+                    Err(RloxError::RuntimeError("Operand must be a number".to_string(), operator.lexeme.clone()))
+                }
+            }
+            TokenType::Bang => {
+                Ok(LoxValue::Boolean(!Interpreter::is_truthy(&rv)))
+            }
+            _ => Err(RloxError::RuntimeError("Unknown unary operator".to_string(), operator.lexeme.clone())),
+        }
+        
+    }
+
+    fn visit_variable_expr(&mut self, name: &Token) -> Result<LoxValue, RloxError> {
+        if let Some(depth) = self.locals.get(name) {
+            self.env.get_by_depth(name, *depth)
+        } else {
+            self.env.get(name)
+        }
+    }
+
+    fn visit_assign_expr(&mut self, left: &Token, right: &expr::Expr) -> Result<LoxValue, RloxError> {
+        let value = right.accept(self)?;
+        if let Some(depth) = self.locals.get(left) {
+            self.env.assign_by_depth(left, value.clone(), *depth)?;
+            Ok(value)
+        } else {
+            self.env.assign(left, value.clone())?;
+            Ok(value)
+        }
+    }
+
     fn visit_call_expr(&mut self, callee: &expr::Expr, arguments: &[expr::Expr]) -> Result<LoxValue, RloxError> {
         let callee_value = callee.accept(self)?;
         if let LoxValue::Callable(method) = callee_value {
@@ -226,18 +244,60 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
                 return Err(RloxError::RuntimeError(format!("Expected {} arguments but got {}", method.arity(), arg_values.len()), String::new()));
             }
             method.invoke(self, arg_values)
+        } else if let LoxValue::Class(class) = callee_value {
+            let instance = LoxInstance::new(&class);
+            let class = instance.class.clone();
+            let initializer = class.borrow().find_method("init");
+            let instance_rc = Rc::new(RefCell::new(instance));
+            if let Some(initializer) = initializer {
+                let mut arg_values = Vec::new();
+                for arg in arguments {
+                    arg_values.push(arg.accept(self)?);
+                }
+                if arg_values.len() != initializer.arity() as usize {
+                    return Err(RloxError::RuntimeError(format!("Expected {} arguments but got {}", initializer.arity(), arg_values.len()), String::new()));
+                }
+                
+                initializer.bind(Rc::clone(&instance_rc)).invoke(self, arg_values)?;
+            }
+
+            Ok(LoxValue::Instance(Rc::clone(&instance_rc)))
         } else {
             Err(RloxError::RuntimeError("Can only call functions and classes!".to_string(), String::new()))
         }
     }
-}
 
-impl Interpreter {
-    fn runtime_error(&mut self, error: RloxError) {
-        eprintln!("{}", error);
+    fn visit_get_expr(&mut self, object: &expr::Expr, name: &Token) -> Result<LoxValue, RloxError> {
+        let object_value = object.accept(self)?;
+        if let LoxValue::Instance(instance) = object_value {
+            instance.borrow().get(&name.lexeme, &instance)
+        } else {
+            Err(RloxError::RuntimeError("Only instances have properties.".to_string(), name.lexeme.clone()))
+        }
+    }
+
+    fn visit_set_expr(&mut self, object: &expr::Expr, name: &Token, value: &expr::Expr) -> Result<LoxValue, RloxError> {
+        let object_value = object.accept(self)?;
+        if let LoxValue::Instance(instance) = object_value {
+            let value = value.accept(self)?;
+            instance.borrow_mut().set(&name.lexeme, value.clone());
+            Ok(value)
+        } else {
+            Err(RloxError::RuntimeError("Only instances have fields.".to_string(), name.lexeme.clone()))
+        }
+    }
+
+    fn visit_this_expr(&mut self, name: &Token) -> Result<LoxValue, RloxError> {
+        if let Some(depth) = self.locals.get(name) {
+            self.env.get_by_depth(name, *depth)
+        } else {
+            self.env.get(name)
+        }
     }
 }
 
+
+// MARK: Statement Visitor
 
 impl stmt::Visitor<Result<(), RloxError>> for Interpreter {
 
@@ -303,7 +363,7 @@ impl stmt::Visitor<Result<(), RloxError>> for Interpreter {
         // resolve names of parameters
         let params: Vec<String> = params.iter().map(|param| param.lexeme.clone()).collect();
         // create a new function
-        let function = LoxValue::Callable(LoxCallable::UserFunction {
+        let function = LoxValue::Callable(LoxFunction::UserFunction{
             def_name: name.clone(),
             params,
             body: Rc::clone(body),
@@ -321,5 +381,34 @@ impl stmt::Visitor<Result<(), RloxError>> for Interpreter {
             LoxValue::Null
         };
         Err(RloxError::ReturnValue(value))
+    }
+
+    fn visit_class_decl_stmt(&mut self, name: &Token, methods: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
+        let class_name = name.lexeme.clone();
+        self.env.define(&class_name, LoxValue::Null);
+
+        let mut class = LoxClass::new(class_name.clone());
+
+        for method in methods {
+            if let stmt::Stmt::FunctionDecl(name, params, body) = method {
+                let method_name = name.lexeme.clone();
+                let function = LoxFunction::UserFunction{
+                    def_name: method_name.clone(),
+                    params: params.iter().map(|param| param.lexeme.clone()).collect(),
+                    body: Rc::clone(body),
+                    closure: Rc::clone(&self.env.values),
+                };
+                // print closure
+
+                // eprintln!("clousure: {:?}", Rc::clone(&self.env.values));
+                class.methods.insert(method_name, function);
+            }
+
+        }
+
+        self.env.assign(name, LoxValue::Class(Rc::new(RefCell::new(class))))?;
+
+
+        Ok(())
     }
 }

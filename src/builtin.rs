@@ -1,13 +1,13 @@
 ///! builtin functions
 
-use crate::value::{LoxCallable, LoxValue};
+use crate::value::{LoxFunction, LoxValue};
 use crate::env::Environment;
 use crate::error::RloxError;
 
 /// Macros to initialize built-in functions
 macro_rules! init_builtin {
     ($env:expr, $name:expr, $arity:expr, $impl:expr) => {
-        $env.define_globally($name, LoxValue::Callable(LoxCallable::BuiltInFunction($arity, $impl)));
+        $env.define_globally($name, LoxValue::Callable(LoxFunction::BuiltInFunction($arity, $impl)));
     };
 }
 

@@ -10,12 +10,20 @@ use crate::ast::*;
 enum FunctionType {
     None,
     Function,
+    Method,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+enum ClassType {
+    None,
+    Class,
 }
 
 pub struct Resolver<'a> {
     pub interpreter: &'a mut Interpreter,
     scope: Vec<HashMap<String, bool>>,
     current_function: FunctionType,
+    current_class: ClassType,
     pub had_error: bool,
 }
 
@@ -25,6 +33,7 @@ impl<'a> Resolver<'a> {
             interpreter,
             scope: Vec::new(),
             current_function: FunctionType::None,
+            current_class: ClassType::None,
             had_error: false,
         }
     }
@@ -116,25 +125,45 @@ impl<'a> Resolver<'a> {
         ))
     }
 
-    fn resolve_function(&mut self, params: &Vec<token::Token>, body: &Rc<Vec<stmt::Stmt>>) -> Result<(), RloxError> {
+    fn resolve_function(&mut self, params: &Vec<token::Token>, body: &Rc<Vec<stmt::Stmt>>, 
+        decl: FunctionType) -> Result<(), RloxError> {
         self.begin_scope();
-        self.current_function = FunctionType::Function;
+        let old_function = self.current_function.clone();
+        self.current_function = decl;
         for param in params {
             self.declare(param)?;
             self.define(param);
         }
         self.resolve_stmts(body)?;
         self.end_scope();
-        self.current_function = FunctionType::None;
+        self.current_function = old_function;
         Ok(())
     }
 }
 
 impl<'a> stmt::Visitor<Result<(), RloxError>> for Resolver<'a> {
+    fn visit_program_stmt(&mut self, declarations: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
+        self.begin_scope();
+        self.current_function = FunctionType::None;
+        self.resolve_stmts(declarations)?;
+        self.end_scope();
+        Ok(())
+    }
+
     fn visit_block_stmt(&mut self, declarations: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
         self.begin_scope();
         self.resolve_stmts(declarations)?;
         self.end_scope();
+        Ok(())
+    }
+
+    fn visit_expression_stmt(&mut self, expression: &expr::Expr) -> Result<(), RloxError> {
+        self.resolve_expr(expression)?;
+        Ok(())
+    }
+
+    fn visit_print_stmt(&mut self, expression: &expr::Expr) -> Result<(), RloxError> {
+        self.resolve_expr(expression)?;
         Ok(())
     }
 
@@ -144,18 +173,6 @@ impl<'a> stmt::Visitor<Result<(), RloxError>> for Resolver<'a> {
             self.resolve_expr(initializer)?;
         }
         self.define(name);
-        Ok(())
-    }
-
-    fn visit_function_decl_stmt(&mut self, name: &token::Token, params: &Vec<token::Token>, body: &Rc<Vec<stmt::Stmt>>) -> Result<(), RloxError> {
-        self.declare(name)?;
-        self.define(name);
-        self.resolve_function(params, body)?;
-        Ok(())
-    }
-
-    fn visit_expression_stmt(&mut self, expression: &expr::Expr) -> Result<(), RloxError> {
-        self.resolve_expr(expression)?;
         Ok(())
     }
 
@@ -174,8 +191,10 @@ impl<'a> stmt::Visitor<Result<(), RloxError>> for Resolver<'a> {
         Ok(())
     }
 
-    fn visit_print_stmt(&mut self, expression: &expr::Expr) -> Result<(), RloxError> {
-        self.resolve_expr(expression)?;
+    fn visit_function_decl_stmt(&mut self, name: &token::Token, params: &Vec<token::Token>, body: &Rc<Vec<stmt::Stmt>>) -> Result<(), RloxError> {
+        self.declare(name)?;
+        self.define(name);
+        self.resolve_function(params, body, FunctionType::Function)?;
         Ok(())
     }
 
@@ -192,16 +211,57 @@ impl<'a> stmt::Visitor<Result<(), RloxError>> for Resolver<'a> {
         Ok(())
     }
 
-    fn visit_program_stmt(&mut self, declarations: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
+    fn visit_class_decl_stmt(&mut self, name: &token::Token, methods: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
+        self.declare(name)?;
+        self.define(name);
+
         self.begin_scope();
-        self.current_function = FunctionType::None;
-        self.resolve_stmts(declarations)?;
+        self.scope.last_mut().unwrap().insert("this".to_string(), true);
+        let enclosing_class = self.current_class.clone();
+        self.current_class = ClassType::Class;
+
+        for method in methods {
+            if let stmt::Stmt::FunctionDecl(_, params, body) = method {
+                self.resolve_function(params, body, FunctionType::Method)?;
+            } else {
+                unreachable!("Class methods should be function declarations");
+            }
+        }
+
+        self.current_class = enclosing_class;
         self.end_scope();
+
         Ok(())
     }
 }
 
 impl<'a> expr::Visitor<Result<(), RloxError>> for Resolver<'a> {
+    fn visit_binary_expr(&mut self, left: &expr::Expr, _operator: &token::Token, right: &expr::Expr) -> Result<(), RloxError> {
+        left.accept(self)?;
+        right.accept(self)?;
+        Ok(())
+    }
+
+    fn visit_logical_expr(&mut self, left: &expr::Expr, _: &token::Token, right: &expr::Expr) -> Result<(), RloxError> {
+        left.accept(self)?;
+        right.accept(self)?;
+        Ok(())
+    }
+
+    fn visit_grouping_expr(&mut self, expression: &expr::Expr) -> Result<(), RloxError> {
+        expression.accept(self)?;
+        Ok(())
+    }
+
+    fn visit_literal_expr(&mut self, _: &expr::LiteralValue) -> Result<(), RloxError> {
+        Ok(())
+    }
+
+    fn visit_unary_expr(&mut self, _operator: &token::Token, right: &expr::Expr) -> Result<(), RloxError> {
+        right.accept(self)?;
+        Ok(())
+    }
+
     fn visit_variable_expr(&mut self, name: &token::Token) -> Result<(), RloxError> {
         if !self.scope.is_empty() {
             if let Some(scope) = self.scope.last() {
@@ -225,17 +285,6 @@ impl<'a> expr::Visitor<Result<(), RloxError>> for Resolver<'a> {
         Ok(())
     }
 
-    fn visit_binary_expr(&mut self, left: &expr::Expr, _operator: &token::Token, right: &expr::Expr) -> Result<(), RloxError> {
-        left.accept(self)?;
-        right.accept(self)?;
-        Ok(())
-    }
-
-    fn visit_grouping_expr(&mut self, expression: &expr::Expr) -> Result<(), RloxError> {
-        expression.accept(self)?;
-        Ok(())
-    }
-
     fn visit_call_expr(&mut self, callee: &expr::Expr, arguments: &[expr::Expr]) -> Result<(), RloxError> {
         callee.accept(self)?;
         for argument in arguments {
@@ -244,18 +293,25 @@ impl<'a> expr::Visitor<Result<(), RloxError>> for Resolver<'a> {
         Ok(())
     }
 
-    fn visit_literal_expr(&mut self, _: &expr::LiteralValue) -> Result<(), RloxError> {
+    fn visit_get_expr(&mut self, object: &expr::Expr, _name: &token::Token) -> Result<(), RloxError> {
+        object.accept(self)?;
         Ok(())
     }
 
-    fn visit_logical_expr(&mut self, left: &expr::Expr, _: &token::Token, right: &expr::Expr) -> Result<(), RloxError> {
-        left.accept(self)?;
-        right.accept(self)?;
+    fn visit_set_expr(&mut self, object: &expr::Expr, _name: &token::Token, value: &expr::Expr) -> Result<(), RloxError> {
+        object.accept(self)?;
+        value.accept(self)?;
         Ok(())
     }
 
-    fn visit_unary_expr(&mut self, _operator: &token::Token, right: &expr::Expr) -> Result<(), RloxError> {
-        right.accept(self)?;
+    fn visit_this_expr(&mut self, name: &token::Token) -> Result<(), RloxError> {
+        if self.current_class == ClassType::None {
+            return Err(RloxError::RuntimeError(
+                format!("Can't use 'this' outside of a class."),
+                String::new()
+            ));
+        }
+        self.resolve_local(name)?;
         Ok(())
     }
 

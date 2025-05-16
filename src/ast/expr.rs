@@ -11,6 +11,9 @@ pub enum Expr {
     Assign(Token, Box<Expr>),
     Variable(Token),
     Call(Box<Expr>, Vec<Expr>, usize), // (callee, arguments, line)
+    Get(Box<Expr>, Token), // (object, name)
+    Set(Box<Expr>, Token, Box<Expr>), // (object, name, value)
+    This(Token), 
 }
 
 #[derive(Debug, Clone)]
@@ -30,6 +33,9 @@ pub trait Visitor<T> {
     fn visit_variable_expr(&mut self, name: &Token) -> T;
     fn visit_assign_expr(&mut self, left: &Token, right: &Expr) -> T;
     fn visit_call_expr(&mut self, callee: &Expr, arguments: &[Expr]) -> T;
+    fn visit_get_expr(&mut self, object: &Expr, name: &Token) -> T;
+    fn visit_set_expr(&mut self, object: &Expr, name: &Token, value: &Expr) -> T;
+    fn visit_this_expr(&mut self, name: &Token) -> T;
 }
 
 impl Expr {
@@ -53,6 +59,12 @@ impl Expr {
                 => visitor.visit_assign_expr(left, right),
             Expr::Call(callee, arguments, _)
                 => visitor.visit_call_expr(callee, arguments),
+            Expr::Get(object, name)
+                => visitor.visit_get_expr(object, name),
+            Expr::Set(object, name, value)
+                => visitor.visit_set_expr(object, name, value),
+            Expr::This(name)
+                => visitor.visit_this_expr(name),
         }
     }
 }
