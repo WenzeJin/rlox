@@ -11,8 +11,7 @@ macro_rules! init_builtin {
     };
 }
 
-
-pub fn register_builtins(env: &mut Environment) {
+pub fn regist_builtins(env: &mut Environment) {
     init_builtin!(env, "clock", 0, clock_impl);
     init_builtin!(env, "input", 0, input_impl);
     init_builtin!(env, "parseNumber", 1, parse_number_impl);
@@ -26,7 +25,7 @@ fn clock_impl(_args: Vec<LoxValue>) -> Result<LoxValue, RloxError> {
             let seconds = duration.as_secs() as f64;
             Ok(LoxValue::Number(seconds))
         }
-        Err(_) => Err(RloxError::RuntimeError("Failed to get clock".to_string(), "clock".to_string())),
+        Err(_) => Err(RloxError::RuntimeError("clock(): Failed to get clock".to_string())),
     }
 }
 
@@ -39,15 +38,15 @@ fn input_impl(_args: Vec<LoxValue>) -> Result<LoxValue, RloxError> {
 
 fn parse_number_impl(args: Vec<LoxValue>) -> Result<LoxValue, RloxError> {
     if args.len() != 1 {
-        return Err(RloxError::RuntimeError("parseNumber takes exactly 1 argument".to_string(), "parseNumber".to_string()));
+        return Err(RloxError::RuntimeError("parseNumber(): Need exactly 1 argument".to_string()));
     }
     match &args[0] {
         LoxValue::String(s) => {
             match s.parse::<f64>() {
                 Ok(n) => Ok(LoxValue::Number(n)),
-                Err(_) => Err(RloxError::RuntimeError("Invalid number format".to_string(), "parseNumber".to_string())),
+                Err(_) => Err(RloxError::RuntimeError("parseNumber(): Invalid number format".to_string())),
             }
         }
-        _ => Err(RloxError::RuntimeError("parseNumber takes a string argument".to_string(), "parseNumber".to_string())),
+        _ => Err(RloxError::RuntimeError("parseNumber(): Need a string argument".to_string())),
     }
 }

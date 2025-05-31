@@ -14,6 +14,7 @@ pub enum Expr {
     Get(Box<Expr>, Token), // (object, name)
     Set(Box<Expr>, Token, Box<Expr>), // (object, name, value)
     This(Token), 
+    Super(Token, Token), // (keyword, method)
 }
 
 #[derive(Debug, Clone)]
@@ -36,6 +37,7 @@ pub trait Visitor<T> {
     fn visit_get_expr(&mut self, object: &Expr, name: &Token) -> T;
     fn visit_set_expr(&mut self, object: &Expr, name: &Token, value: &Expr) -> T;
     fn visit_this_expr(&mut self, name: &Token) -> T;
+    fn visit_super_expr(&mut self, keyword: &Token, method: &Token) -> T;
 }
 
 impl Expr {
@@ -65,6 +67,8 @@ impl Expr {
                 => visitor.visit_set_expr(object, name, value),
             Expr::This(name)
                 => visitor.visit_this_expr(name),
+            Expr::Super(keyword, method)
+                => visitor.visit_super_expr(keyword, method),
         }
     }
 }

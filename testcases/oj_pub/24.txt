@@ -1,0 +1,1 @@
+RuntimeError: Undefined property 'ghost'.

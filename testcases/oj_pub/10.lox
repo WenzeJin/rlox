@@ -1,0 +1,7 @@
+var a = "outside";
+{
+  var b = "inside";
+  print a;
+  print b;
+}
+print b;

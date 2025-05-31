@@ -15,7 +15,7 @@ pub enum Stmt {
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     While(Expr, Box<Stmt>),
     FunctionDecl(Token, Vec<Token>, Rc<Vec<Stmt>>),   // Decl name, params, body. Body uses Rc, because function instance will link to it.
-    ClassDecl(Token, Vec<Stmt>), // Class name, methods (FuntionDecl)
+    ClassDecl(Token, Option<Expr>, Vec<Stmt>), // Class name, super class, methods (FuntionDecl)
 }
 
 pub trait Visitor<T> {
@@ -28,7 +28,7 @@ pub trait Visitor<T> {
     fn visit_while_stmt(&mut self, condition: &Expr, body: &Box<Stmt>) -> T;
     fn visit_function_decl_stmt(&mut self, name: &Token, params: &Vec<Token>, body: &Rc<Vec<Stmt>>) -> T;
     fn visit_return_stmt(&mut self, value: &Option<Expr>) -> T;
-    fn visit_class_decl_stmt(&mut self, name: &Token, methods: &Vec<Stmt>) -> T;
+    fn visit_class_decl_stmt(&mut self, name: &Token, super_class: &Option<Expr>, methods: &Vec<Stmt>) -> T;
 }
 
 impl Stmt {
@@ -54,8 +54,8 @@ impl Stmt {
                 => visitor.visit_function_decl_stmt(name, params, body),
             Stmt::Return(value)
                 => visitor.visit_return_stmt(value),
-            Stmt::ClassDecl(name, methods)
-                => visitor.visit_class_decl_stmt(name, methods),
+            Stmt::ClassDecl(name,super_class, methods)
+                => visitor.visit_class_decl_stmt(name, super_class, methods),
 
         }
     }

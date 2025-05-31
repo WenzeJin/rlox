@@ -1,0 +1,8 @@
+fun f() {
+  return "hello";
+}
+
+print f() + 1; // 错误：字符串与数字相加
+
+var obj = "not a function";
+obj(); // 错误：非函数调用

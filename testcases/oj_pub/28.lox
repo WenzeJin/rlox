@@ -1,0 +1,15 @@
+class Animal {
+  speak() {
+    print "generic sound";
+  }
+}
+
+class Bird < Animal {
+  speak() {
+    super.speak();
+    print "tweet";
+  }
+}
+
+var b = Bird();
+b.speak();

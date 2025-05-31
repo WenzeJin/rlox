@@ -111,6 +111,16 @@ impl expr::Visitor<String> for AstPrinter {
     fn visit_this_expr(&mut self, name: &token::Token) -> String {
         return name.lexeme.clone();
     }
+
+    fn visit_super_expr(&mut self, keyword: &token::Token, method: &token::Token) -> String {
+        let mut result = String::new();
+        result.push_str("(super ");
+        result.push_str(&keyword.lexeme);
+        result.push_str(" ");
+        result.push_str(&method.lexeme);
+        result.push_str(")");
+        result
+    }
 }
 
 impl stmt::Visitor<String> for AstPrinter {
@@ -192,10 +202,14 @@ impl stmt::Visitor<String> for AstPrinter {
         result
     }
 
-    fn visit_class_decl_stmt(&mut self, name: &token::Token, methods: &Vec<stmt::Stmt>) -> String {
+    fn visit_class_decl_stmt(&mut self, name: &token::Token, super_class: &Option<expr::Expr>, methods: &Vec<stmt::Stmt>) -> String {
         let mut result = String::new();
         result.push_str("(class ");
         result.push_str(&name.lexeme);
+        if let Some(super_class) = super_class {
+            result.push_str(" ");
+            result.push_str(&super_class.accept(self));
+        }
         for method in methods {
             result.push_str(" ");
             result.push_str(&method.accept(self));

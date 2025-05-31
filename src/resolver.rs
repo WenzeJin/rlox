@@ -11,12 +11,14 @@ enum FunctionType {
     None,
     Function,
     Method,
+    Initializer
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum ClassType {
     None,
     Class,
+    SubClass,
 }
 
 pub struct Resolver<'a> {
@@ -93,9 +95,8 @@ impl<'a> Resolver<'a> {
             }
         }
         if error {
-            Err(RloxError::RuntimeError(
-                format!("Variable with this name already declared in this scope: {}", name.lexeme),
-                String::new()
+            Err(RloxError::SemanticError(
+                "Already a variable with this name in this scope.".to_string(),
             ))
         } else {
             Ok(())
@@ -118,11 +119,7 @@ impl<'a> Resolver<'a> {
                 return Ok(());
             }
         }
-        // Not found in any scope
-        Err(RloxError::RuntimeError(
-            format!("Undefined variable: {}", name.lexeme),
-            String::new()
-        ))
+        Ok(())
     }
 
     fn resolve_function(&mut self, params: &Vec<token::Token>, body: &Rc<Vec<stmt::Stmt>>, 
@@ -200,29 +197,57 @@ impl<'a> stmt::Visitor<Result<(), RloxError>> for Resolver<'a> {
 
     fn visit_return_stmt(&mut self, value: &Option<expr::Expr>) -> Result<(), RloxError> {
         if self.current_function == FunctionType::None {
-            return Err(RloxError::RuntimeError(
-                format!("Can't return from non-function."),
-                String::new()
+            return Err(RloxError::SemanticError(
+                format!("Can't return from top-level code.")
             ));
         }
+        
         if let Some(value) = value {
+            if self.current_function == FunctionType::Initializer {
+                return Err(RloxError::SemanticError(
+                    format!("Can't return a value from an initializer.")
+                ));
+            }
             self.resolve_expr(value)?;
         }
         Ok(())
     }
 
-    fn visit_class_decl_stmt(&mut self, name: &token::Token, methods: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
+    fn visit_class_decl_stmt(&mut self, name: &token::Token, super_class: &Option<expr::Expr>, methods: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
         self.declare(name)?;
         self.define(name);
 
-        self.begin_scope();
-        self.scope.last_mut().unwrap().insert("this".to_string(), true);
         let enclosing_class = self.current_class.clone();
         self.current_class = ClassType::Class;
 
+        if let Some(super_class) = super_class {
+            if let expr::Expr::Variable(ref super_name) = super_class {
+                if super_name.lexeme == name.lexeme {
+                    return Err(RloxError::SemanticError(
+                        format!("A class can't inherit from itself.")
+                    ));
+                }
+            }
+            self.resolve_expr(super_class)?;
+
+            self.begin_scope();
+            self.scope.last_mut().unwrap().insert("super".to_string(), true);
+            self.current_class = ClassType::SubClass;
+        }
+
+        self.begin_scope();
+        self.scope.last_mut().unwrap().insert("this".to_string(), true);
+        
+
         for method in methods {
-            if let stmt::Stmt::FunctionDecl(_, params, body) = method {
-                self.resolve_function(params, body, FunctionType::Method)?;
+            if let stmt::Stmt::FunctionDecl(name, params, body) = method {
+                let is_initializer = name.lexeme == "init";
+                let function_type = if is_initializer {
+                    FunctionType::Initializer
+                } else {
+                    FunctionType::Method
+                };
+                self.resolve_function(params, body, function_type)?;
             } else {
                 unreachable!("Class methods should be function declarations");
             }
@@ -230,6 +255,9 @@ impl<'a> stmt::Visitor<Result<(), RloxError>> for Resolver<'a> {
 
         self.current_class = enclosing_class;
         self.end_scope();
+        if let Some(_super_class) = super_class {
+            self.end_scope();
+        }
 
         Ok(())
     }
@@ -267,9 +295,8 @@ impl<'a> expr::Visitor<Result<(), RloxError>> for Resolver<'a> {
             if let Some(scope) = self.scope.last() {
                 if let Some(defined) = scope.get(&name.lexeme) {
                     if !defined {
-                        return Err(RloxError::RuntimeError(
-                            format!("Can't read local variable in its own initializer."),
-                            String::new()
+                        return Err(RloxError::SemanticError(
+                            format!("Can't read local variable in its own initializer.")
                         ));
                     }
                 }
@@ -306,12 +333,25 @@ impl<'a> expr::Visitor<Result<(), RloxError>> for Resolver<'a> {
 
     fn visit_this_expr(&mut self, name: &token::Token) -> Result<(), RloxError> {
         if self.current_class == ClassType::None {
-            return Err(RloxError::RuntimeError(
-                format!("Can't use 'this' outside of a class."),
-                String::new()
+            return Err(RloxError::SemanticError(
+                format!("Can't use 'this' outside of a class.")
             ));
         }
         self.resolve_local(name)?;
+        Ok(())
+    }
+
+    fn visit_super_expr(&mut self, keyword: &token::Token, _method: &token::Token) -> Result<(), RloxError> {
+        if self.current_class == ClassType::None {
+            return Err(RloxError::SemanticError(
+                format!("Can't use 'super' outside of a class.")
+            ));
+        } else if self.current_class == ClassType::Class {
+            return Err(RloxError::SemanticError(
+                format!("Can't use 'super' in a class with no superclass.")
+            ));
+        }
+        self.resolve_local(keyword)?;
         Ok(())
     }
 

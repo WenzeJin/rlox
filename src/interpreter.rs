@@ -5,7 +5,7 @@ use crate::class::{LoxClass, LoxInstance};
 use crate::env::Environment;
 use crate::ast::token::{Token, TokenType};
 use crate::error::RloxError;
-use crate::builtin::register_builtins;
+use crate::builtin::regist_builtins;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::collections::HashMap;
@@ -19,7 +19,7 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn new() -> Interpreter {
         let mut environment = Environment::new();
-        register_builtins(&mut environment);
+        regist_builtins(&mut environment);
         Interpreter {
             had_error: false,
             env: environment,
@@ -82,7 +82,7 @@ impl Interpreter {
     }
 
     fn runtime_error(&mut self, error: RloxError) {
-        eprintln!("{}", error);
+        println!("{}", error);
     }
 }
 
@@ -98,67 +98,67 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
                 match (lv, rv) {
                     (LoxValue::Number(l), LoxValue::Number(r)) => Ok(LoxValue::Number(l + r)),
                     (LoxValue::String(l), LoxValue::String(r)) => Ok(LoxValue::String(format!("{l}{r}"))),
-                    _ => Err(RloxError::RuntimeError("Operands must be two numbers or two strings".to_string(), operator.lexeme.clone()))
+                    _ => Err(RloxError::RuntimeError("Operands must be two numbers or two strings.".to_string()))
                 }
             }
             TokenType::Minus => {
                 if let (LoxValue::Number(l), LoxValue::Number(r)) = (lv, rv) {
                     Ok(LoxValue::Number(l - r))
                 } else {
-                    Err(RloxError::RuntimeError("Operands must be numbers".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operands must be two numbers.".to_string()))
                 }
             }
             TokenType::Star => {
                 if let (LoxValue::Number(l), LoxValue::Number(r)) = (lv, rv) {
                     Ok(LoxValue::Number(l * r))
                 } else {
-                    Err(RloxError::RuntimeError("Operands must be numbers".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operands must be two numbers.".to_string()))
                 }
             }
             TokenType::Slash => {
                 if let (LoxValue::Number(l), LoxValue::Number(r)) = (lv, rv) {
                     if r == 0.0 {
-                        Err(RloxError::RuntimeError("Division by zero".to_string(), operator.lexeme.clone()))
+                        Err(RloxError::RuntimeError("Division by zero.".to_string()))
                     } else {
                         Ok(LoxValue::Number(l / r))
                     }
                 } else {
-                    Err(RloxError::RuntimeError("Operands must be numbers".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operands must be two numbers.".to_string()))
                 }
             }
             TokenType::Greater => {
                 if let (LoxValue::Number(l), LoxValue::Number(r)) = (lv, rv) {
                     Ok(LoxValue::Boolean(l > r))
                 } else {
-                    Err(RloxError::RuntimeError("Operands must be numbers".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operands must be two numbers.".to_string()))
                 }
             }
             TokenType::GreaterEqual => {
                 if let (LoxValue::Number(l), LoxValue::Number(r)) = (lv, rv) {
                     Ok(LoxValue::Boolean(l >= r))
                 } else {
-                    Err(RloxError::RuntimeError("Operands must be numbers".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operands must be two numbers.".to_string()))
                 }
             }
             TokenType::Less => {
                 if let (LoxValue::Number(l), LoxValue::Number(r)) = (lv, rv) {
                     Ok(LoxValue::Boolean(l < r))
                 } else {
-                    Err(RloxError::RuntimeError("Operands must be numbers".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operands must be two numbers.".to_string()))
                 }
             }
             TokenType::LessEqual => {
                 if let (LoxValue::Number(l), LoxValue::Number(r)) = (lv, rv) {
                     Ok(LoxValue::Boolean(l <= r))
                 } else {
-                    Err(RloxError::RuntimeError("Operands must be numbers".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operands must be two numbers.".to_string()))
                 }
             }
             TokenType::EqualEqual => 
                 Ok(LoxValue::Boolean(lv == rv)),
             TokenType::BangEqual => 
                 Ok(LoxValue::Boolean(lv != rv)),
-            _ => Err(RloxError::RuntimeError("Unknown binary operator".to_string(), operator.lexeme.clone()))
+            _ => Err(RloxError::RuntimeError("Unknown binary operator.".to_string()))
         }
     }
 
@@ -179,7 +179,7 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
                     Ok(lv)
                 }
             }
-            _ => Err(RloxError::RuntimeError("Unknown logical operator".to_string(), operator.lexeme.clone()))
+            _ => Err(RloxError::RuntimeError("Unknown logical operator.".to_string()))
         }
     }
 
@@ -203,13 +203,13 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
                 if let LoxValue::Number(n) = rv {
                     Ok(LoxValue::Number(-n))
                 } else {
-                    Err(RloxError::RuntimeError("Operand must be a number".to_string(), operator.lexeme.clone()))
+                    Err(RloxError::RuntimeError("Operand must be a number.".to_string()))
                 }
             }
             TokenType::Bang => {
                 Ok(LoxValue::Boolean(!Interpreter::is_truthy(&rv)))
             }
-            _ => Err(RloxError::RuntimeError("Unknown unary operator".to_string(), operator.lexeme.clone())),
+            _ => Err(RloxError::RuntimeError("Unknown unary operator.".to_string())),
         }
         
     }
@@ -241,7 +241,7 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
                 arg_values.push(arg.accept(self)?);
             }
             if arg_values.len() != method.arity() as usize {
-                return Err(RloxError::RuntimeError(format!("Expected {} arguments but got {}", method.arity(), arg_values.len()), String::new()));
+                return Err(RloxError::RuntimeError(format!("Expected {} arguments but got {}.", method.arity(), arg_values.len())));
             }
             method.invoke(self, arg_values)
         } else if let LoxValue::Class(class) = callee_value {
@@ -255,7 +255,7 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
                     arg_values.push(arg.accept(self)?);
                 }
                 if arg_values.len() != initializer.arity() as usize {
-                    return Err(RloxError::RuntimeError(format!("Expected {} arguments but got {}", initializer.arity(), arg_values.len()), String::new()));
+                    return Err(RloxError::RuntimeError(format!("Expected {} arguments but got {}.", initializer.arity(), arg_values.len())));
                 }
                 
                 initializer.bind(Rc::clone(&instance_rc)).invoke(self, arg_values)?;
@@ -263,7 +263,7 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
 
             Ok(LoxValue::Instance(Rc::clone(&instance_rc)))
         } else {
-            Err(RloxError::RuntimeError("Can only call functions and classes!".to_string(), String::new()))
+            Err(RloxError::RuntimeError("Can only call functions and classes.".to_string()))
         }
     }
 
@@ -272,7 +272,7 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
         if let LoxValue::Instance(instance) = object_value {
             instance.borrow().get(&name.lexeme, &instance)
         } else {
-            Err(RloxError::RuntimeError("Only instances have properties.".to_string(), name.lexeme.clone()))
+            Err(RloxError::RuntimeError("Only instances have properties.".to_string()))
         }
     }
 
@@ -283,7 +283,7 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
             instance.borrow_mut().set(&name.lexeme, value.clone());
             Ok(value)
         } else {
-            Err(RloxError::RuntimeError("Only instances have fields.".to_string(), name.lexeme.clone()))
+            Err(RloxError::RuntimeError("Only instances have fields.".to_string()))
         }
     }
 
@@ -292,6 +292,29 @@ impl expr::Visitor<Result<LoxValue, RloxError>> for Interpreter {
             self.env.get_by_depth(name, *depth)
         } else {
             self.env.get(name)
+        }
+    }
+
+    fn visit_super_expr(&mut self, keyword: &Token, method: &Token) -> Result<LoxValue, RloxError> {
+        if let Some(depth) = self.locals.get(keyword) {
+            let super_class = self.env.get_by_depth(keyword, *depth)?;
+            if let LoxValue::Class(super_class) = super_class {
+                if let Some(method) = super_class.borrow().find_method(&method.lexeme) {
+                    let this_token = Token::new(TokenType::This, "this".to_string(), 0);
+                    let this_value = self.env.get_by_depth(&this_token, *depth - 1)?;
+                    if let LoxValue::Instance(instance) = this_value {
+                        return Ok(LoxValue::Callable(method.bind(Rc::clone(&instance))));
+                    } else {
+                        unreachable!("This should always be an instance.");
+                    }
+                } else {
+                    return Err(RloxError::RuntimeError(format!("Undefined property '{}'.", method.lexeme)));
+                }
+            } else {
+                unreachable!("Super class should always be a class.");
+            }
+        } else {
+            return Err(RloxError::RuntimeError("Can't use 'super' in a class with no superclass.".to_string()));
         }
     }
 }
@@ -368,6 +391,7 @@ impl stmt::Visitor<Result<(), RloxError>> for Interpreter {
             params,
             body: Rc::clone(body),
             closure: Rc::clone(&self.env.values),
+            is_initializer: false,
         });
         // define the function in the current environment
         self.env.define(&name, function);
@@ -383,11 +407,23 @@ impl stmt::Visitor<Result<(), RloxError>> for Interpreter {
         Err(RloxError::ReturnValue(value))
     }
 
-    fn visit_class_decl_stmt(&mut self, name: &Token, methods: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
+    fn visit_class_decl_stmt(&mut self, name: &Token, maybe_super_class: &Option<expr::Expr>, methods: &Vec<stmt::Stmt>) -> Result<(), RloxError> {
         let class_name = name.lexeme.clone();
         self.env.define(&class_name, LoxValue::Null);
 
         let mut class = LoxClass::new(class_name.clone());
+
+        // set super class
+        if let Some(super_class) = maybe_super_class {
+            if let LoxValue::Class(super_class) = super_class.accept(self)? {
+                class.super_class = Some(Rc::clone(&super_class));
+                // define super
+                self.env.enter_scope();
+                self.env.define("super", LoxValue::Class(Rc::clone(&super_class)));
+            } else {
+                return Err(RloxError::SemanticError("Superclass must be a class".to_string()));
+            }
+        }
 
         for method in methods {
             if let stmt::Stmt::FunctionDecl(name, params, body) = method {
@@ -397,13 +433,16 @@ impl stmt::Visitor<Result<(), RloxError>> for Interpreter {
                     params: params.iter().map(|param| param.lexeme.clone()).collect(),
                     body: Rc::clone(body),
                     closure: Rc::clone(&self.env.values),
+                    is_initializer: method_name == "init",
                 };
-                // print closure
-
                 // eprintln!("clousure: {:?}", Rc::clone(&self.env.values));
-                class.methods.insert(method_name, function);
+                class.methods.insert(method_name.clone(), function);
             }
 
+        }
+
+        if let Some(_super_class) = maybe_super_class {
+            self.env.exit_scope();
         }
 
         self.env.assign(name, LoxValue::Class(Rc::new(RefCell::new(class))))?;

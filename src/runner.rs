@@ -49,14 +49,11 @@ fn run_tree_walk(source: String) {
             let mut resolver = Resolver::new(&mut interpreter);
             resolver.resolve_program(&program);
             if resolver.had_error {
-                eprintln!("Error occurred during resolution.");
                 return;
             }
             interpreter.interpret(program);
         }
-        None => {
-            eprintln!("No parse result found. Error occurred during parsing.");
-        }
+        None => {}
     }
 }
 
@@ -75,8 +72,6 @@ fn run_tree_walk_continuous(source: String, resolver: &mut Resolver) {
             resolver.resolve_program(&program);
             resolver.interpreter.interpret(program);
         }
-        None => {
-            eprintln!("No parse result found. Error occurred during parsing.");
-        }
+        None => {}
     }
 }

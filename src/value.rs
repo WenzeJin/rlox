@@ -1,5 +1,6 @@
 //! Implements values in lox language.
 
+use crate::ast::token::{Token, TokenType};
 use crate::error::RloxError;
 use crate::interpreter::Interpreter;
 use crate::ast::stmt::Stmt;
@@ -41,6 +42,7 @@ pub enum LoxFunction {
         params: Vec<String>,
         body: Rc<Vec<Stmt>>,
         closure: Rc<RefCell<EnvItem>>,  // Environment of this function
+        is_initializer: bool,
     },
 }
 
@@ -84,11 +86,13 @@ impl LoxFunction {
             panic!("Arity should be checked before invoking");
         }
         match self {
-            LoxFunction::UserFunction{ params, body, closure, .. } => {
+            LoxFunction::UserFunction{ params, body, closure, is_initializer, .. } => {
                 // create a new environment for the function call
                 let global = interpreter.env.global.clone();
                 let closure = closure.clone();
-                let env = Environment::from(global, closure);
+                let old_call_stack = interpreter.env.call_stack;
+                let env = Environment::from(old_call_stack + 1, global, closure)?;
+               
                 let old_env = interpreter.change_env(env);
                 // enter a new scope
                 interpreter.env.enter_scope();
@@ -100,16 +104,30 @@ impl LoxFunction {
                 let result = interpreter.execute_block(body);
                 // exit the scope
                 interpreter.env.exit_scope();
-                interpreter.change_env(old_env);
+                let closure = interpreter.change_env(old_env);
                 // return the result
                 // if the result is a return statement, return the value
                 match result {
                     Ok(_) => {
-                        Ok(LoxValue::Null)
+                        if *is_initializer {
+                            // if the function is an initializer, always return this
+                            let this_token = Token::new(TokenType::This, "this".to_string(), 0);
+                            let this = closure.get_by_depth(&this_token, 0).unwrap();
+                            Ok(this)
+                        } else {
+                            Ok(LoxValue::Null)
+                        }
                     },
                     Err(RloxError::ReturnValue(value)) => {
                         // return the value
-                        Ok(value)
+                        if *is_initializer {
+                            // if the function is an initializer, always return this
+                            let this_token = Token::new(TokenType::This, "this".to_string(), 0);
+                            let this = closure.get_by_depth(&this_token, 0).unwrap();
+                            Ok(this)
+                        } else {
+                            Ok(value)
+                        }
                     },
                     Err(e) => {
                         // return the error
@@ -126,7 +144,7 @@ impl LoxFunction {
 
     pub fn bind(&self, instance: Rc<RefCell<LoxInstance>>) -> LoxFunction {
         match self {
-            LoxFunction::UserFunction { def_name, params, body, closure } => {
+            LoxFunction::UserFunction { def_name, params, body, closure , is_initializer} => {
                 // eprintln!("old closure: {:?}", closure);
                 let mut new_closure = EnvItem::from_parent(Rc::clone(&closure));
                 new_closure.table.insert("this".to_string(), LoxValue::Instance(instance));
@@ -135,6 +153,7 @@ impl LoxFunction {
                     params: params.clone(),
                     body: Rc::clone(body),
                     closure: Rc::new(RefCell::new(new_closure)),
+                    is_initializer: *is_initializer,
                 }
             }
             _ => panic!("Cannot bind a built-in function"),

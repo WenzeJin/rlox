@@ -1,0 +1,7 @@
+class Dog {
+  speak() {
+    print "woof";
+  }
+}
+var d = Dog();
+d.speak();

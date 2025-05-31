@@ -137,8 +137,9 @@ impl Parser {
                 Expr::Get(object, name) => {
                     return Ok(Expr::Set(object, name, Box::new(value)));
                 }
+                // TODO: if we need list, we can add it here
                 _ => {
-                    return Err(self.error("Invalid assignment target, requires variable"));
+                    return Err(self.error("Invalid assignment target, requires variable."));
                 }
             }
         }
@@ -319,7 +320,14 @@ impl Parser {
             },
             TokenType::This => {
                 Ok(Expr::This(self.advance().clone()))
-            }
+            },
+            TokenType::Super => {
+                self.advance();
+                let keyword = self.previous().clone();
+                self.consume(TokenType::Dot, "Expect '.' after 'super'")?;
+                let method = self.consume(TokenType::Identifier, "Expect superclass method name")?.clone();
+                Ok(Expr::Super(keyword, method))
+            },
             _ => Err(self.error("Expected expression")),
         }
     }
@@ -519,6 +527,14 @@ impl Parser {
 
     fn class_declaration(&mut self) -> Result<Stmt, RloxError> {
         let name = self.consume(TokenType::Identifier, "Expect class name")?.clone();
+        
+        let mut super_class: Option<Expr> = None;
+        if self.match_token(vec![TokenType::Less]) {
+            self.consume(TokenType::Identifier, "Expect superclass name")?;
+            let super_name = self.previous().clone();
+            super_class = Some(Expr::Variable(super_name));
+        }
+
         self.consume(TokenType::LeftBrace, "Expect '{' after class name")?;
 
         let mut methods = vec![];
@@ -530,6 +546,6 @@ impl Parser {
 
         self.consume(TokenType::RightBrace, "Expect '}' after class body")?;
 
-        Ok(Stmt::ClassDecl(name, methods))
+        Ok(Stmt::ClassDecl(name, super_class, methods))
     }
 }

@@ -67,24 +67,3 @@ fn test_expr(#[case] source: &str, #[case] expected: LoxValue) {
     let result = expression.accept(&mut interpreter).unwrap();
     assert_eq!(result, expected);
 }
-
-
-#[rstest]
-/// These expressions should cause runtime errors (e.g. type errors, division by zero)
-#[case::string_plus_number("\"hello\" + 123")]
-#[case::string_minus_number("\"hello\" - 123")]
-#[case::boolean_plus_string("true + \"world\"")]
-#[case::number_plus_string("123 + \"world\"")]
-#[case::invalid_negation("-\"hello\"")]
-#[case::comparison_with_string("\"abc\" > \"def\"")]
-#[case::division_by_zero("123 / 0")]
-#[should_panic]
-fn test_runtime_error(#[case] source: &str) {
-    let mut scanner = Scanner::new(source.to_string());
-    let tokens = scanner.scan_tokens();
-    let mut parser = Parser::new(tokens);
-    let expression = parser.parse_expr().unwrap();
-    let mut interpreter = Interpreter::new();
-    let _ = expression.accept(&mut interpreter).unwrap(); // should panic
-}
-

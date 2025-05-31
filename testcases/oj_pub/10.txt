@@ -1,0 +1,3 @@
+outside
+inside
+RuntimeError: Undefined variable 'b'.

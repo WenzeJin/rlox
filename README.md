@@ -2,9 +2,6 @@
 
 [![Rust Build & Test](https://github.com/WenzeJin/rlox/actions/workflows/rust.yml/badge.svg)](https://github.com/WenzeJin/rlox/actions/workflows/rust.yml)  
 
-> [!NOTE] 
-> This repository is a work in progress and may not be fully functional yet.
-
 `rlox` is a Rust implementation of the Lox programming language, as described in the book [Crafting Interpreters](http://craftinginterpreters.com/). It includes a REPL (Read-Eval-Print Loop) and the ability to execute Lox scripts.
 
 ## Features

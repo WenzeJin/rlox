@@ -1,0 +1,3 @@
+if ("not a bool") {
+  print "fail";
+}
